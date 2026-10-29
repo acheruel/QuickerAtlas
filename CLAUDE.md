@@ -24,6 +24,8 @@ la redécouvrir à chaque fois.
   CDP (port 9333, WebSocket natif de Node 24).
 - Préparer l'état sans cliquer : `localStorage['pq-couches-v060'] = 'eau,rtss,degel'` (couches), `#s=<num>`
   (structure ouverte), `#w=Q…` (pont remarquable), `#c=<mode>` (mode de couleur).
+- Volet masqué : `requestAnimationFrame` y est suspendu (zoom à la molette non testable) ; passer par Chrome sans
+  interface, sauf pour la vidéo des caméras de Québec 511 (Cloudflare bloque Chrome sans interface).
 - Toujours finir par : console sans erreur, largeurs 1440 / 800 / 375 px.
 
 ## Façon de travailler

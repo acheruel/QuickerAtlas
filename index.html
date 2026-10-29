@@ -3,8 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QuickerAtlas v0.6.6 · Atlas des ouvrages d’art du Québec</title>
-<meta name="description" content="Proposition de visualisation de l'inventaire des structures (ponts, ponceaux, murs, tunnels) du ministère des Transports et de la Mobilité durable du Québec.">
+<title>QuickerAtlas v0.6.7 · Atlas d’ouvrages d’art au Québec</title>
+<!-- v0.6.7 : titre et description repris dans l'aperçu des liens partagés (Teams, courriel, réseaux : balises Open Graph) -->
+<meta name="description" content="Visualisation moderne de l’inventaire des structures du MTMD au Québec, avec ma touche personnelle : profil LiDAR, données des cours d’eau, sismiques, etc. ! À partir de données publiques.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="QuickerAtlas">
+<meta property="og:locale" content="fr_CA">
+<meta property="og:title" content="QuickerAtlas · Atlas d’ouvrages d’art au Québec">
+<meta property="og:description" content="Visualisation moderne de l’inventaire des structures du MTMD au Québec, avec ma touche personnelle : profil LiDAR, données des cours d’eau, sismiques, etc. ! À partir de données publiques.">
+<meta property="og:url" content="https://acheruel.github.io/QuickerAtlas/">
+<meta property="og:image" content="https://acheruel.github.io/QuickerAtlas/docs/apercu-lien.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Carte de QuickerAtlas : ouvrages d’art du Québec colorés selon leur état">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#102d41">
 <link rel="preconnect" href="https://server.arcgisonline.com">
 <link rel="preconnect" href="https://tile.openstreetmap.org">
@@ -219,22 +231,41 @@ label{font-size:.875rem}
 .rq-wait{padding:20px}
 .lg-sub{margin-top:6px;font-size:.75rem;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);font-weight:650}
 .leaflet-tooltip{font-family:"Segoe UI",Arial,sans-serif;font-size:.78rem;color:var(--ink);border-color:var(--line)}
+/* v0.6.7 : caméras de Québec 511 : bulle de survol (nom en haut, vidéo en direct dessous) ; sur écran tactile, fenêtre */
+.leaflet-tooltip.cam-tip-wrap{padding:0;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px #102d4140}
+.cam-tip{width:min(352px,78vw);display:flex;flex-direction:column;font-size:.75rem;line-height:1.35;white-space:normal}
+.cam-h{display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f3f7f9;border-bottom:1px solid var(--line)}
+.cam-h .sym{margin:0}
+.cam-h b{display:block;font-size:.8125rem;color:var(--ink)}
+.cam-h small{display:block;color:var(--muted)}
+.cam-v{position:relative;aspect-ratio:352/240;background:#0d2333;display:grid;place-items:center;overflow:hidden}
+.cam-v video,.cam-v img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.cam-v.ready .ld-spin{display:none}
+.cam-live{position:absolute;left:8px;bottom:8px;padding:1px 8px;border-radius:999px;background:#102d41cc;color:#fff;font-size:.7rem;font-weight:650}
+.cam-live::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:#73e4c2;margin-right:5px}
+.cam-f{padding:5px 10px;color:var(--muted);font-size:.72rem}
+.cam-go{display:block;padding:8px 10px;font-weight:600;color:var(--teal);text-decoration:none;border-top:1px solid var(--line)}
+.cam-na{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:14px;background:#fff;color:#1f4f87;text-align:center}
+.cam-na p{margin:0;font-size:.85rem;line-height:1.35}
+.leaflet-popup.cam-pop .leaflet-popup-content-wrapper{padding:0;overflow:hidden;border-radius:10px}
+.leaflet-popup.cam-pop .leaflet-popup-content{margin:0;width:auto!important}
 
-/* « Quoi de neuf » (P5) : bouton et panneau. v0.6.6 : bouton dans la barre des onglets (avant : barre du haut),
-   panneau placé sous le bouton à l'ouverture */
-.view-tabs .news-btn[aria-expanded=true]{background:var(--mint);border-color:var(--teal);color:#00534f}
+/* « Quoi de neuf » (P5). v0.6.6 : bouton dans la barre des onglets. v0.6.7 : onglet à part entière (avant : panneau
+   flottant sous le bouton) ; en-tête et période en haut, changements et inspections côte à côte sur grand écran */
 .news-n{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--navy);color:#fff;font-size:.75rem;font-weight:700;display:inline-grid;place-items:center;font-variant-numeric:tabular-nums}
 .news-n[hidden]{display:none}
-.news{position:fixed;z-index:2500;top:calc(var(--topbar-h) + 8px);right:28px;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - var(--topbar-h) - 24px);display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px #102d4133}
-.news[hidden]{display:none}
-.nw-head{display:flex;align-items:flex-start;gap:10px;padding:14px 14px 10px 18px;border-bottom:1px solid var(--line)}
-.nw-head h2{margin:0;font-size:1.05rem;letter-spacing:-.2px}
+.view-tabs button.active .news-n{background:#fff;color:var(--teal)}
+.newsview{overflow:auto;flex:1;min-height:0;display:flex;flex-direction:column;gap:14px;scrollbar-width:thin}
+.newsview[hidden]{display:none}
+.nw-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 24px}
+.nw-head h2{margin:0;font-size:1.05rem;letter-spacing:-.2px;text-transform:none}
 .nw-head p{margin:3px 0 0;font-size:.75rem;color:var(--muted)}
-.nw-head>div{flex:1;min-width:0}
-.nw-body{overflow:auto;padding:12px 18px 16px;scrollbar-width:thin}
-.nw-period{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:.78rem;color:var(--muted)}
+.nw-head>div:first-child{flex:1 1 260px;min-width:0}
+.nw-period{display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--muted);flex:0 1 380px}
 .nw-period .segmented{flex:1}
-.nw-sec{margin-bottom:16px}
+.nw-top .nw-note{margin:10px 0 0;max-width:90ch}
+.nw-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+@media(max-width:1100px){.nw-grid{grid-template-columns:minmax(0,1fr)}}
 .nw-sec h3{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 6px;font-size:.75rem;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:650;border-bottom:1px solid var(--line);padding-bottom:4px}
 .nw-sec h3 b{color:var(--ink);font-size:.8rem;letter-spacing:0;font-variant-numeric:tabular-nums}
 .nw-note{font-size:.78rem;color:var(--muted);margin:4px 0 8px;line-height:1.45}
@@ -498,7 +529,18 @@ abbr[title]{text-decoration:underline dotted #8aa1ae;text-underline-offset:2px;c
 .st-idx{display:flex;align-items:center;gap:6px;font-size:.8125rem;color:var(--muted)}
 .st-idx button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 12px;font-weight:600;color:var(--teal);min-height:28px;cursor:pointer}
 .st-idx button[aria-pressed="true"]{background:var(--teal);border-color:var(--teal);color:#fff}
-.st-key{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}.st-key>span{display:inline-flex;align-items:center}
+.st-key{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:.8125rem}.st-key>span{white-space:nowrap}
+/* v0.6.7 : bandeau des statistiques (sous-onglets, indice des barres, légende en rectangles) qui reste en haut de la vue */
+.st-bar{position:sticky;top:0;z-index:5;display:flex;flex-direction:column;gap:8px;padding:2px 0 10px;background:var(--bg);border-bottom:1px solid var(--line)}
+.st-tabs{display:flex;flex-wrap:wrap;gap:5px}
+.st-tabs button{border:1px solid #c3d2dc;background:#fff;border-radius:999px;padding:5px 14px;font-size:.8125rem;color:var(--ink);box-shadow:0 1px 2px #15354a0f}
+.st-tabs button:hover:not([aria-selected=true]){border-color:var(--teal);background:#f1faf8}
+.st-tabs button[aria-selected=true]{background:var(--navy);border-color:var(--navy);color:#fff}
+.st-keyrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 20px}
+.key-sw{display:inline-block;flex:none;width:20px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;border:1px solid #15354a40}
+.lg .key-sw{margin:0}
+.st-pane{display:flex;flex-direction:column;gap:14px}
+.st-pane>.st-h:first-child{margin-top:0}
 .st-h3{font-size:.875rem;margin:14px 0 4px}
 .st-res{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .st-rescard:hover,.st-rescard:focus-visible{border-color:#9fd8c6;background:#fbfefd}
@@ -506,7 +548,6 @@ abbr[title]{text-decoration:underline dotted #8aa1ae;text-underline-offset:2px;c
 .st-resp{font-size:1.25rem;font-weight:700;color:var(--teal);font-variant-numeric:tabular-nums}
 .st-resk{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:10px;font-size:.8125rem;color:var(--muted)}
 .st-resk b{color:var(--ink);font-variant-numeric:tabular-nums}
-.cs-sw{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid #15354a40;flex:none}
 @media(max-width:700px){.st-res{grid-template-columns:minmax(0,1fr)}}
 .pbar{height:12px;background:#eef2f5;border-radius:3px;overflow:hidden}
 .pbar>span{display:block;height:100%;background:#a50026;border-radius:3px}
@@ -530,7 +571,7 @@ abbr[title]{text-decoration:underline dotted #8aa1ae;text-underline-offset:2px;c
 .sbar>span:first-child{border-radius:4px 0 0 4px}
 .sbar>span:last-child{border-radius:0 4px 4px 0}
 .sbar>span:only-child{border-radius:4px}
-.lg{display:grid;grid-template-columns:12px minmax(0,1fr) auto auto;gap:5px 10px;align-items:center;margin-top:12px;font-size:.8125rem}
+.lg{display:grid;grid-template-columns:20px minmax(0,1fr) auto auto;gap:5px 10px;align-items:center;margin-top:12px;font-size:.8125rem}
 .lg .n{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
 .lg .p{font-variant-numeric:tabular-nums;color:var(--muted);text-align:right;min-width:48px}
 .key{display:flex;gap:14px;flex-wrap:wrap;font-size:.75rem;color:var(--muted);margin-bottom:8px}
@@ -649,7 +690,7 @@ table.list tbody tr:hover{background:#eef5f7}
       </g>
       <path d="M5 37c1.6-6.6 7.4-10.6 15-10.6S33.4 30.4 35 37" fill="none" stroke="#73e4c2" stroke-width="2.4" stroke-linecap="round"/>
     </svg>
-    <div>Quicker<span>Atlas</span><small>Atlas des ouvrages d’art du Québec · inventaire du MTMD</small></div>
+    <div>Quicker<span>Atlas</span><small>Atlas d’ouvrages d’art au Québec</small></div>
   </div>
   <!-- v0.6.5 : avertissement permanent (outil personnel, non affilié au MTMD). v0.6.6 : texte complet dans la fenêtre
        d'accueil, que cette pastille rouvre -->
@@ -797,13 +838,15 @@ table.list tbody tr:hover{background:#eef5f7}
   <main class="main">
     <div class="main-head">
     <button type="button" class="show-filters" id="show-filters" aria-controls="inputs" aria-expanded="false" hidden title="Afficher le panneau des filtres"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filtres<span class="nf-n" id="nf-n"></span></button>
-    <!-- v0.6.6 : onglets avec icônes ; « Défilement » devient « Galerie » ; « Quoi de neuf » entre Galerie et Ponts remarquables -->
+    <!-- v0.6.6 : onglets avec icônes ; « Défilement » devient « Galerie » ; « Quoi de neuf » entre Galerie et Ponts remarquables.
+         v0.6.7 : « Quoi de neuf » est un onglet à part entière (avant : panneau flottant) -->
+
     <nav class="view-tabs" id="view-tabs" aria-label="Vues">
       <button type="button" class="active" data-view="carte" aria-current="page"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z"/><path d="M9 4v13.5M15 6.5V20"/></svg>Carte</button>
       <button type="button" data-view="liste"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></svg>Liste</button>
       <button type="button" data-view="stats"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 20h16M7 16v-5M12 16V6M17 16v-8"/></svg><span class="tab-l">Statistiques</span><span class="tab-c">Stats</span></button>
       <button type="button" data-view="defile" title="Les structures filtrées une à une, en grand, photos d’abord (tirage au hasard)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="15.5" cy="9" r="1.4" fill="currentColor"/></svg>Galerie</button>
-      <button type="button" class="news-btn" id="news-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="news" title="Changements entre les mises à jour et inspections récentes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="news-lbl"><span class="tab-l">Quoi de neuf</span><span class="tab-c">Nouveau</span></span><span class="news-n" id="news-n" hidden></span></button>
+      <button type="button" class="news-btn" id="news-btn" data-view="news" title="Changements entre les mises à jour et inspections récentes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="news-lbl"><span class="tab-l">Quoi de neuf</span><span class="tab-c">Nouveau</span></span><span class="news-n" id="news-n" hidden></span></button>
       <button type="button" data-view="remarq" title="Ponts remarquables du Canada (Wikipédia), hors inventaire du MTMD"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z" fill="currentColor"/></svg><span class="tab-l">Ponts remarquables</span><span class="tab-c">Remarquables</span></button>
     </nav>
     <section class="metrics kpi-bar" aria-label="Indicateurs">
@@ -827,6 +870,8 @@ table.list tbody tr:hover{background:#eef5f7}
     <div class="stats view" id="view-stats" hidden></div>
 
     <div class="remarq view" id="view-remarq" hidden></div>
+
+    <div class="newsview view" id="view-news" hidden></div>
 
     <div class="defile view" id="view-defile" hidden>
       <div class="df-scroll" id="df-scroll" tabindex="0" aria-label="Galerie des structures, une à la fois"></div>
@@ -853,7 +898,6 @@ table.list tbody tr:hover{background:#eef5f7}
   </main>
 </div>
 <div id="tip" role="tooltip" hidden></div>
-<section class="news" id="news" role="dialog" aria-labelledby="news-title" hidden></section>
 <!-- v0.6.6 : fenêtre d'accueil à chaque démarrage ; il faut accepter l'avertissement pour continuer -->
 <dialog id="welcome" class="welcome" aria-labelledby="wc-title" aria-describedby="wc-warn">
   <div class="wc-hero">
@@ -876,7 +920,7 @@ table.list tbody tr:hover{background:#eef5f7}
   <ul class="wc-list">
     <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z"/><path d="M9 4v13.5M15 6.5V20"/></svg><span><b>Explorez</b> sur la carte, en liste, en statistiques ou en galerie de photos.</span></li>
     <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span><b>Filtrez</b> par type, état (ICG), région, année ou hauteur libre.</span></li>
-    <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5" stroke-linecap="round"/></svg><span><b>Ouvrez une fiche</b> : photos, inspections, profil LiDAR, cours d’eau, aléa sismique.</span></li>
+    <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5" stroke-linecap="round"/></svg><span><b>Ouvrez une fiche</b> : photos, inspections, profil LiDAR, cours d’eau, environnement, aléa sismique.</span></li>
   </ul>
   <div class="wc-warn" id="wc-warn">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2.8 1.6 20.6h20.8z" fill="#f2c14e"/><path d="M12 9v5.2M12 16.6v1.4" stroke="#102d41" stroke-width="2.2" stroke-linecap="round"/></svg>
@@ -891,7 +935,7 @@ table.list tbody tr:hover{background:#eef5f7}
   <div class="sp-head"><span class="axle-badge">LiDAR</span><div><b id="ld-title">Profil LiDAR</b><small id="ld-sub"></small></div><button type="button" class="sp-close" data-ld-close aria-label="Fermer" title="Fermer (Échap)">×</button></div>
   <div class="ld-body"></div>
 </dialog>
-<!-- Fenêtres « Cours d'eau au pont » et « Aléa sismique » : modules js/*.js chargés à la première ouverture -->
+<!-- Fenêtres « Cours d'eau au pont », « Environnement » et « Aléa sismique » : modules js/*.js chargés à la première ouverture -->
 <dialog id="aux-dialog" class="section-dialog" aria-labelledby="ax-title">
   <div class="sp-head"><span class="axle-badge" id="ax-badge"></span><div><b id="ax-title"></b><small id="ax-sub"></small></div><button type="button" class="sp-close" data-ld-close aria-label="Fermer" title="Fermer (Échap)">×</button></div>
   <div class="ld-body ax-body"></div>
@@ -900,7 +944,7 @@ table.list tbody tr:hover{background:#eef5f7}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="data/structures.js"></script>
 <script src="data/details.js"></script>
-<script>window.PQ_META={"version": "0.6.6", "date": "2026-10-24", "author": "Anthony Chéruel"};</script>
+<script>window.PQ_META={"version": "0.6.7", "date": "2026-10-29", "author": "Anthony Chéruel"};</script>
 <script>
 (function(){
   'use strict';
@@ -1329,7 +1373,7 @@ table.list tbody tr:hover{background:#eef5f7}
   OBST_ORDER.forEach(function(r){ var o = document.createElement('option'); o.value = r; o.textContent = r; $('#obst').appendChild(o); });
 
   var HASH_KEYS = { q: 'q', famille: 'f', types: 't', region: 'r', reseau: 'n', ob: 'o', icg: 'icg', ias: 'ias', amin: 'a0', amax: 'a1', lmin: 'l', h: 'h', lp: 'p', hp: 'hp', vi: 'vi', ch: 'ch' };
-  var VIEWS = ['carte', 'stats', 'liste', 'defile', 'remarq'];
+  var VIEWS = ['carte', 'stats', 'liste', 'defile', 'news', 'remarq'];          // v0.6.7 : « news » = Quoi de neuf
   function numOk(v){ return v != null && v !== '' && isFinite(parseFloat(v)); }
   function stateToHash(){
     var p = new URLSearchParams();
@@ -2036,6 +2080,104 @@ table.list tbody tr:hover{background:#eef5f7}
   });
   $('#view-remarq').addEventListener('error', function(e){ if (e.target.tagName === 'IMG') e.target.replaceWith(document.createRange().createContextualFragment('<span class="rq-noimg">' + starSvg(28) + '</span>')); }, true);
 
+  // ---------- Caméras de circulation (v0.6.7) : Québec 511, vidéo au survol, clic = carte de Québec 511 ----------
+  // Liste : data/couche-cameras.js (etl/cameras.py, MTMD, CC BY 4.0). Pictogramme de caméra vidéo (pastille carrée
+  // marine, caméra blanche, objectif menthe) : ni rond (structures) ni étoile (ponts remarquables). Rastérisé une fois,
+  // dessiné dans le canevas commun, au-dessus des structures. Survol : nom de la caméra et boucle vidéo des dernières
+  // images, lue en direct sur le serveur de Québec 511 (rien n'est enregistré ni copié). Vidéo en échec : image fixe de
+  // la caméra (Québec 511 y met lui-même son image « non disponible »), sinon le même message en texte.
+  var CAM_GLYPH = '<rect x="2" y="2" width="28" height="28" rx="8" fill="#102d41" stroke="#fff" stroke-width="2"/>' +
+    '<rect x="6.5" y="10.5" width="13.5" height="11" rx="2.6" fill="#fff"/><path d="M21.2 14.4 26.3 11.2v9.6l-5.1-3.2z" fill="#fff"/>' +
+    '<circle cx="11.6" cy="16" r="2.6" fill="#73e4c2" stroke="#102d41" stroke-width="1.1"/><circle cx="16.8" cy="13.2" r="1" fill="#102d41"/>';
+  function camSvg(px){ return '<svg class="sym" width="' + px + '" height="' + px + '" viewBox="0 0 32 32" aria-hidden="true">' + CAM_GLYPH + '</svg>'; }
+  var CAM_BMP = null;
+  function camBitmap(){
+    if (CAM_BMP) return CAM_BMP;
+    var img = new Image(), bmp = document.createElement('canvas');
+    bmp.width = bmp.height = 64; bmp.ready = false;
+    img.onload = function(){ bmp.getContext('2d').drawImage(img, 0, 0, 64, 64); bmp.ready = true; if (canvas && canvas._redraw) canvas._redraw(); };
+    img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 32 32">' + CAM_GLYPH + '</svg>');
+    return (CAM_BMP = bmp);
+  }
+  function camSize(z){ return Math.round(Math.max(15, Math.min(26, 13 + (z - 6) * 1.4))); }
+  var CamPin = window.L ? L.CircleMarker.extend({
+    _project: function(){ this._radius = this.options.radius = camSize(this._map.getZoom()) / 2; L.CircleMarker.prototype._project.call(this); },
+    _updateBounds: function(){ var r = this._radius + 2 + this._clickTolerance(); this._pxBounds = new L.Bounds(this._point.subtract([r, r]), this._point.add([r, r])); },
+    _containsPoint: function(p){ return Math.abs(p.x - this._point.x) <= this._radius + 1 && Math.abs(p.y - this._point.y) <= this._radius + 1; },
+    _updatePath: function(){
+      var r = this._renderer, img = camBitmap(), s = this._radius * 2;
+      if (!r._drawing || this._empty() || !img.ready) return;
+      r._ctx.globalAlpha = 1; r._ctx.drawImage(img, this._point.x - s / 2, this._point.y - s / 2, s, s);
+    }
+  }) : null;
+  function camUrl(t, v){ return t.replace(/\{(\w+)\}/g, function(m, k){ return v[k] != null ? encodeURIComponent(v[k]) : m; }); }
+  function camStill(C, num){
+    var m = /^([A-Z])(\d+)$/.exec(num || ''), ville = m && C.villes[m[1]];
+    // l'image fixe est gardée un jour en cache par le navigateur : paramètre de la minute courante (comme Québec 511)
+    return ville ? camUrl(C.image, { ville: ville, n: m[2] }) + '?t=' + Math.floor(Date.now() / 60000) : null;
+  }
+  function camCarteUrl(C, c){ return camUrl(C.carte, { lat: (c[0] / C.echelle).toFixed(5), lon: (c[1] / C.echelle).toFixed(5) }); }
+  var CAM_NA = '<div class="cam-na"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3l18 18M15.5 10.7 21 7v10l-2.2-1.4M14 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1M10 7h4a2 2 0 0 1 2 2v2.5"/></svg>' +
+    '<p>Cette image n’est pas disponible en ce moment.</p><p>Nous nous excusons de cet inconvénient.</p></div>';
+  function camHtml(C, c, lien){
+    var sub = [c[3], c[5] ? 'route ' + c[5] : null, C.regions[c[6]]].filter(Boolean).join(' · ');
+    return '<div class="cam-tip"><div class="cam-h">' + camSvg(18) + '<div><b>' + esc(c[7] ? c[7] + ' · ' + c[4] : c[4]) + '</b><small>' + esc(sub) + '</small></div></div>' +
+      '<div class="cam-v" data-still="' + esc(camStill(C, c[3]) || '') + '"><span class="ld-spin" aria-hidden="true"></span>' +
+      '<video src="' + esc(camUrl(C.video, { id: c[2] })) + '" autoplay muted loop playsinline preload="auto" aria-label="Vidéo en direct de la caméra ' + esc(c[3] || c[2]) + '"></video>' +
+      '<span class="cam-live">En direct · Québec 511</span></div>' +
+      (lien ? '<a class="cam-go" href="' + esc(camCarteUrl(C, c)) + '" target="_blank" rel="noopener">Ouvrir dans la carte de Québec 511 ↗</a>' : '<div class="cam-f">Clic : carte de Québec 511 à cet endroit</div>') + '</div>';
+  }
+  // Lecture lancée dès l'ouverture ; vidéo en échec → image fixe → message
+  function camWire(el){
+    var box = el && el.querySelector('.cam-v'), v = box && box.querySelector('video');
+    if (!v || v.dataset.ok) return;
+    v.dataset.ok = '1';
+    var still = box.getAttribute('data-still');
+    function na(){ box.classList.add('ready'); box.innerHTML = CAM_NA; }
+    v.addEventListener('playing', function(){ box.classList.add('ready'); });
+    v.addEventListener('error', function(){
+      if (!still) { na(); return; }
+      var im = new Image();
+      im.alt = 'Dernière image de la caméra'; im.referrerPolicy = 'no-referrer';
+      im.onload = function(){ box.classList.add('ready'); box.replaceChildren(im); };
+      im.onerror = na;
+      im.src = still;
+    });
+    var p = v.play && v.play(); if (p && p.catch) p.catch(function(){ /* lecture automatique refusée : l'image reste */ });
+  }
+  var CAM_TOUCH = window.matchMedia && matchMedia('(hover: none)').matches;
+  function buildCameras(){
+    var C = couche('cameras'), g = L.layerGroup();
+    if (!C) return g;
+    camBitmap();
+    C.cameras.forEach(function(c, i){
+      var m = new CamPin([c[0] / C.echelle, c[1] / C.echelle], { renderer: canvas, radius: 9, cam: true, attribution: i ? null : esc(C.attribution) });
+      if (CAM_TOUCH) {
+        // écran tactile : pas de survol ; le toucher ouvre la vidéo et un lien vers Québec 511
+        m.bindPopup(function(){ return camHtml(C, c, true); }, { className: 'cam-pop', maxWidth: 380, minWidth: 240, autoPanPadding: [12, 12] });
+        m.on('popupopen', function(e){ camWire(e.popup.getElement()); });
+        return g.addLayer(m);
+      }
+      // La bulle (≈ 350 × 290 px) s'ouvre du côté où elle tient dans la carte : posé avant bindTooltip, ce réglage passe
+      // avant l'ouverture
+      m.on('mouseover', function(){
+        var t = m.getTooltip(), p = map.latLngToContainerPoint(m.getLatLng()), sz = map.getSize();
+        var v = p.y > 310 ? 'top' : p.y < sz.y - 310 ? 'bottom' : null;           // au-dessus ou au-dessous…
+        if (t) t.options.direction = p.x < 190 ? 'right' : p.x > sz.x - 190 ? 'left' : v || (p.x < sz.x / 2 ? 'right' : 'left');   // …sauf près d'un bord
+      });
+      m.bindTooltip(function(){ return camHtml(C, c, false); }, { direction: 'top', offset: [0, -4], className: 'cam-tip-wrap', opacity: 1 });
+      m.on('tooltipopen', function(e){ camWire(e.tooltip.getElement()); });
+      m.on('click', function(){ window.open(camCarteUrl(C, c), '_blank', 'noopener'); });
+      g.addLayer(m);
+    });
+    return g;
+  }
+  // Caméras au-dessus des structures (apply() ajoute les structures en dernier dans le canevas commun)
+  function camsFront(){
+    var ov = map && ovByKey('cameras');
+    if (ov && ov.paths && map.hasLayer(ov.layer)) ov.paths.forEach(function(p){ p.bringToFront(); });
+  }
+
   // ---------- Aléa sismique (v0.5.6) : PGA du CNBC (classe C, 2 % en 50 ans) + classes de site de Montréal ----------
   // Images rééchantillonnées en Web Mercator par etl/sismique.py, sous les réseaux (volet « raster »).
   // v0.6.0 : PGA (toute la province) et classes de site (Québec) en deux couches séparées, superposables ;
@@ -2277,6 +2419,8 @@ table.list tbody tr:hover{background:#eef5f7}
     }
     h += '<div class="dr-links">' + links.join('') + '<span class="dr-wiki" id="dr-wiki">' + wikiLinksHtml(o) + '</span>' + (o.lat != null ? '<button type="button" data-act="center">Centrer la carte</button><button type="button" class="ld-btn" data-act="lidar" title="Profils en long et en travers, hauteur sous l’ouvrage, relief ombré local (LiDAR 1 m de RNCan, calcul de quelques secondes)">Profil LiDAR</button>' +
       (o.obst === "Cours d'eau" ? '<button type="button" class="ld-btn" data-act="hydro" title="Bassin versant, zone inondable, niveaux et débits à la station la plus proche">Cours d’eau</button>' : '') +
+      // v0.6.7 : fenêtre « Environnement » (prototype « Zones sensibles » intégré), pour tous les ouvrages
+      '<button type="button" class="ld-btn" data-act="environnement" title="Aires protégées, habitats fauniques et floristiques, espèces en situation précaire, milieux humides, zones inondables et espèces envahissantes autour de l’ouvrage (1, 2 ou 5 km)">Environnement</button>' +
       '<button type="button" class="ld-btn" data-act="sismique" title="Spectres d’aléa du CNBC 2020/2025 (classes de site A à E, probabilités 2, 5 et 10 % en 50 ans)">Aléa sismique</button>' : '') + '</div>';
     h += '</div>';
     // Photo en grand à gauche, identification à droite ; le reste sur deux colonnes en dessous
@@ -2367,7 +2511,7 @@ table.list tbody tr:hover{background:#eef5f7}
     else if (act === 'center' && selWp != null && wpById(selWp)) centerOn(wpById(selWp));
     else if (act === 'center' && o) centerOn(o);
     else if (act === 'lidar' && o) openLidar(o);
-    else if ((act === 'hydro' || act === 'sismique') && o) openAux(act, o);
+    else if ((act === 'hydro' || act === 'sismique' || act === 'environnement') && o) openAux(act, o);
     else if ((act === 'mtmd' || act === 'ville') && byNum[b.getAttribute('data-num')]) select(byNum[b.getAttribute('data-num')], { center: true });
     else if (act === 'geo' && o) {
       b.disabled = true; b.textContent = 'Chargement…';
@@ -2379,7 +2523,6 @@ table.list tbody tr:hover{background:#eef5f7}
   });
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape' && ($('#lidar-dialog').open || $('#aux-dialog').open || welcome.open)) return;   // la fenêtre se ferme seule (dialog)
-    if (e.key === 'Escape' && !$('#news').hidden) { closeNews(); return; }
     if (e.key === 'Escape' && (selNum != null || selWp != null)) { closeFiche(); }
   });
 
@@ -2567,11 +2710,14 @@ table.list tbody tr:hover{background:#eef5f7}
     head.addEventListener('pointerup', function(){ drag = null; });
   }
 
-  // ---------- Modules à la demande : js/hydro.js (« Cours d'eau au pont »), js/sismique.js (« Aléa sismique ») ----------
+  // ---------- Modules à la demande : js/hydro.js (« Cours d'eau au pont »), js/sismique.js (« Aléa sismique »),
+  // js/environnement.js (« Environnement », v0.6.7) ----------
   // Contrat : le module s'enregistre dans window.QA_MOD[clé] = { render: function(o, body, ctx){ … } } et reçoit
   // ctx = { alive() : faux si la fenêtre a été fermée ou rouverte pour un autre ouvrage, onClose(fn), setSub(texte) }.
   var AUX = { hydro: { badge: 'HYDRO', title: 'Cours d’eau au pont', wait: 'Cours d’eau, bassin, zone inondable et station la plus proche…' },
-    sismique: { badge: 'SÉISME', title: 'Aléa sismique', wait: 'Valeurs du CNBC à l’ouvrage…' } };
+    sismique: { badge: 'SÉISME', title: 'Aléa sismique', wait: 'Valeurs du CNBC à l’ouvrage…' },
+    // v0.6.7 : js/environnement.js (zones sensibles autour de l'ouvrage)
+    environnement: { badge: 'ENV', title: 'Environnement', wait: 'Aires protégées, habitats, espèces, milieux humides et zones inondables autour de l’ouvrage…' } };
   var axRun = 0, axClose = [];
   function openAux(kind, o){
     var A = AUX[kind], dlg = $('#aux-dialog'), body = dlg.querySelector('.ax-body'), run = ++axRun;
@@ -2642,7 +2788,7 @@ table.list tbody tr:hover{background:#eef5f7}
       its.slice(0, 12).map(function(it){ return '<li><span>' + esc(it[0]) + '</span>' + chgText(it) + '</li>'; }).join('') + '</ul></section>';
   }
 
-  // Pastille : changements publiés depuis la dernière ouverture du panneau
+  // Pastille : changements publiés depuis la dernière visite de l'onglet
   var NEWS_SEEN = 'pq-news-vu';
   function updateNewsBadge(){
     var seen = null, b = $('#news-n');
@@ -2655,10 +2801,16 @@ table.list tbody tr:hover{background:#eef5f7}
   }
   function journalPret(){
     J = window.PQ_JOURNAL || { items: [], runs: [], debut: null };
-    updateNewsBadge();
+    if (view === 'news') newsSeen(); else updateNewsBadge();
     if (state.ch && state.ch[0] === 'c') apply();
     refreshExtra();
-    if (!$('#news').hidden) renderNews();
+    if (view === 'news') renderNews();
+  }
+  // v0.6.7 : onglet ouvert = changements consultés (la pastille s'efface)
+  function newsSeen(){
+    var last = J && J.runs[0] ? J.runs[0][0] : null;
+    if (last) { try { localStorage.setItem(NEWS_SEEN, last); } catch (e) { /* idem */ } }
+    updateNewsBadge();
   }
 
   var newsPeriod = 90, NEWS_MAX = 120;
@@ -2667,8 +2819,10 @@ table.list tbody tr:hover{background:#eef5f7}
     return '<li tabindex="0" data-k="' + esc(key) + '"><span class="nw-d">' + esc(date) + '</span><span class="nw-t" title="' + esc(label) + '"><b>' + esc(o ? o.num : key) + '</b> ' + esc(label) + '</span>' +
       '<span class="nw-c">' + change + '</span></li>';
   }
+  // v0.6.7 : onglet à part entière (avant : panneau flottant) : en-tête et période dans une carte, puis les deux listes
+  // côte à côte (l'une sous l'autre sur écran étroit)
   function renderNews(){
-    var el = $('#news'), since = addDays(REF, -newsPeriod), j = J || { items: [], runs: [], debut: null };
+    var el = $('#view-news'), since = addDays(REF, -newsPeriod), j = J || { items: [], runs: [], debut: null };
     var items = j.items.filter(function(it){ return it[0] >= since; });
     var cats = {};
     items.forEach(function(it){ var c = chgCat(it); cats[c] = (cats[c] || 0) + 1; });
@@ -2676,19 +2830,18 @@ table.list tbody tr:hover{background:#eef5f7}
     for (var num in detData) { var ig = detData[num].ig; if (ig && ig >= since && byNum[num]) insp.push([ig, num]); }
     insp.sort(function(a, b){ return a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : collator.compare(a[1], b[1]); });
     var last = j.runs[0], prev = j.runs[1];
-    var h = '<div class="nw-head"><div><h2 id="news-title">Quoi de neuf</h2><p>Données au ' + esc(REF) + (j.debut ? ' · journal tenu depuis le ' + esc(j.debut) : '') + '</p></div>' +
-      '<button type="button" class="dr-close" data-nw="close" aria-label="Fermer" title="Fermer (Échap)">×</button></div><div class="nw-body">';
-    h += '<div class="nw-period"><span>Période</span><div class="segmented" role="group" aria-label="Période">' +
+    var h = '<div class="card nw-top"><div class="nw-head"><div><h2 id="news-title">Quoi de neuf</h2><p>Données au ' + esc(REF) + (j.debut ? ' · journal tenu depuis le ' + esc(j.debut) : '') +
+      (last ? ' · dernière mise à jour le ' + esc(last[0]) + ' : ' + (last[1] ? nf.format(last[1]) + ' changement' + (last[1] > 1 ? 's' : '') : 'aucun changement') + (prev ? ' par rapport à celle du ' + esc(prev[0]) : '') : '') + '</p></div>' +
+      '<div class="nw-period"><span>Période</span><div class="segmented" role="group" aria-label="Période">' +
       [[30, '30 jours'], [90, '3 mois'], [365, '12 mois']].map(function(p){
         var on = p[0] === newsPeriod;
         return '<button type="button" data-nw-p="' + p[0] + '" class="' + (on ? 'active' : '') + '" aria-pressed="' + on + '">' + p[1] + '</button>';
-      }).join('') + '</div></div>';
+      }).join('') + '</div></div></div>' +
+      '<p class="nw-note">Chaque mise à jour des données est comparée à la précédente : nouvelles structures, ICG, IAS et fermetures, limitations, travaux prévus. Cliquer une ligne ouvre la fiche sur la carte.</p></div><div class="nw-grid">';
 
-    h += '<section class="nw-sec"><h3>Changements entre les mises à jour <b>' + nf.format(items.length) + '</b></h3>';
-    if (last) h += '<p class="nw-note">Dernière mise à jour le ' + esc(last[0]) + ' : ' + (last[1] ? nf.format(last[1]) + ' changement' + (last[1] > 1 ? 's' : '') : 'aucun changement') +
-      (prev ? ' par rapport à celle du ' + esc(prev[0]) : '') + '.</p>';
+    h += '<section class="card nw-sec"><h3>Changements entre les mises à jour <b>' + nf.format(items.length) + '</b></h3>';
     if (!items.length) {
-      h += '<p class="nw-note">Aucun changement détecté sur la période. Chaque mise à jour des données est comparée à la précédente : nouvelles structures, ICG, IAS et fermetures, limitations, travaux prévus et inspections générales.</p>';
+      h += '<p class="nw-note">Aucun changement détecté sur la période.</p>';
     } else {
       h += '<div class="nw-cats">' + CAT_ORDER.filter(function(c){ return cats[c]; }).map(function(c){ return '<span>' + esc(CAT_LABEL[c]) + ' · ' + nf.format(cats[c]) + '</span>'; }).join('') + '</div>';
       h += '<ul class="nw-list">' + items.slice(0, NEWS_MAX).map(function(it){
@@ -2699,7 +2852,7 @@ table.list tbody tr:hover{background:#eef5f7}
     }
     h += '</section>';
 
-    h += '<section class="nw-sec"><h3>Inspections générales récentes <b>' + nf.format(insp.length) + '</b></h3>' +
+    h += '<section class="card nw-sec"><h3>Inspections générales récentes <b>' + nf.format(insp.length) + '</b></h3>' +
       '<p class="nw-note">Date de la dernière inspection générale inscrite dans les fiches du MTMD.</p>';
     if (insp.length) {
       h += '<ul class="nw-list">' + insp.slice(0, NEWS_MAX).map(function(x){
@@ -2710,47 +2863,16 @@ table.list tbody tr:hover{background:#eef5f7}
     } else h += '<p class="nw-note">Aucune inspection générale sur la période.</p>';
     el.innerHTML = h + '</section></div>';
   }
-  // v0.6.6 : le panneau s'ouvre sous son bouton (barre des onglets), sans dépasser l'écran
-  function placeNews(){
-    var el = $('#news'), r = $('#news-btn').getBoundingClientRect(), w = Math.min(560, window.innerWidth - 32);
-    el.style.top = Math.round(r.bottom + 6) + 'px';
-    el.style.left = Math.round(Math.max(16, Math.min(r.left, window.innerWidth - w - 16))) + 'px';
-    el.style.right = 'auto';
-    el.style.maxHeight = Math.max(240, Math.round(window.innerHeight - r.bottom - 22)) + 'px';
-  }
-  window.addEventListener('resize', function(){ if (!$('#news').hidden) placeNews(); });
-  function openNews(){
-    renderNews();
-    placeNews();
-    $('#news').hidden = false;
-    $('#news-btn').setAttribute('aria-expanded', 'true');
-    var c = $('#news').querySelector('[data-nw="close"]'); if (c) c.focus({ preventScroll: true });
-    var last = J && J.runs[0] ? J.runs[0][0] : null;
-    if (last) { try { localStorage.setItem(NEWS_SEEN, last); } catch (e) { /* idem */ } }
-    updateNewsBadge();
-  }
-  function closeNews(focusBtn){
-    if ($('#news').hidden) return;
-    $('#news').hidden = true;
-    $('#news-btn').setAttribute('aria-expanded', 'false');
-    if (focusBtn !== false) $('#news-btn').focus({ preventScroll: true });
-  }
-  $('#news-btn').addEventListener('click', function(){ if ($('#news').hidden) openNews(); else closeNews(); });
-  document.addEventListener('pointerdown', function(e){
-    if (!$('#news').hidden && !e.target.closest('#news') && !e.target.closest('#news-btn')) closeNews(false);
-  });
   function newsOpen(li){
     var o = li && byNum[li.getAttribute('data-k')];
     if (!o) return;
-    closeNews(false);
     showView('carte');
     select(o, { center: true });
   }
-  $('#news').addEventListener('click', function(e){
-    var t = e.target.closest('[data-nw],[data-nw-p],[data-nw-f],li[data-k]');
+  $('#view-news').addEventListener('click', function(e){
+    var t = e.target.closest('[data-nw-p],[data-nw-f],li[data-k]');
     if (!t) return;
-    if (t.hasAttribute('data-nw')) closeNews();
-    else if (t.hasAttribute('data-nw-p')) { newsPeriod = parseInt(t.getAttribute('data-nw-p'), 10); renderNews(); }
+    if (t.hasAttribute('data-nw-p')) { newsPeriod = parseInt(t.getAttribute('data-nw-p'), 10); renderNews(); }
     else if (t.hasAttribute('data-nw-f')) {
       // « Voir sur la carte » : filtre « Suivi » correspondant, toutes familles (inventaire public)
       var keep = { hp: state.hp, vi: state.vi };
@@ -2758,12 +2880,11 @@ table.list tbody tr:hover{background:#eef5f7}
       state.hp = keep.hp; state.vi = keep.vi; state.famille = 'tous';
       state.ch = t.getAttribute('data-nw-f') + newsPeriod;
       stateToUI();
-      closeNews(false);
       showView('carte');
       writeHash(); apply(); reframe(true);
     } else newsOpen(t);
   });
-  $('#news').addEventListener('keydown', function(e){
+  $('#view-news').addEventListener('keydown', function(e){
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('li[data-k]')) { e.preventDefault(); newsOpen(e.target); }
   });
 
@@ -2802,6 +2923,7 @@ table.list tbody tr:hover{background:#eef5f7}
         group.addLayer(v.m); v.on = true;
       }
     }
+    camsFront();
     if (selRing) selRing.bringToFront();
     visible = vis;
     updateTypeCounts(tcn);
@@ -2836,6 +2958,7 @@ table.list tbody tr:hover{background:#eef5f7}
     else if (view === 'liste') renderList();
     else if (view === 'defile' && dfDirty) dfBuild();
     else if (view === 'remarq') renderRemarq();
+    else if (view === 'news') renderNews();
   }
   function showView(v){
     view = v;
@@ -2847,10 +2970,11 @@ table.list tbody tr:hover{background:#eef5f7}
     VIEWS.forEach(function(k){ $('#view-' + k).hidden = v !== k; });
     if (v === 'carte' && map) setTimeout(function(){ map.invalidateSize(); reframe(false); updateLabels(); }, 0);
     renderActive();
+    if (v === 'news') newsSeen();
     if (v === 'defile') $('#df-scroll').focus({ preventScroll: true });
   }
   $('#view-tabs').addEventListener('click', function(e){
-    var b = e.target.closest('button[data-view]');          // v0.6.6 : « Quoi de neuf » est dans la barre, sans vue
+    var b = e.target.closest('button[data-view]');
     if (!b) return;
     showView(b.getAttribute('data-view'));
     writeHash();
@@ -2949,24 +3073,22 @@ table.list tbody tr:hover{background:#eef5f7}
   };
   var statsIdx = 'icg';
   try { if (SIDX[localStorage.getItem('pq-stats-indice')]) statsIdx = localStorage.getItem('pq-stats-indice'); } catch (e) { /* stockage indisponible */ }
-  // Classes de site sismique par ouvrage (data/classes-site.js) et couleurs de la couche : chargées à la première
-  // ouverture des statistiques, puis la vue se redessine
-  var csState = 0;
-  function ensureClassesSite(){
-    if (csState) return;
-    csState = 1;
-    Promise.all([loadScript('data/classes-site.js'), loadScript('data/couche-sismique.js')]).then(function(){ csState = 2; if (view === 'stats') renderStats(); }, function(){ csState = 3; });
-  }
-  var CS_ORDER = ['A', 'B', 'C', 'D', 'E'];
+  // v0.6.7 : statistiques groupées en sous-onglets (une catégorie à la fois : peu de défilement) ; légende de l'indice en
+  // rectangles de couleur (plus lisibles que les petits points), commune à toutes les barres, dans un bandeau qui reste
+  // en haut. Section « Sol : classe de site sismique » retirée (demande) : la fenêtre « Aléa sismique » garde la classe.
+  var ST_TABS = [['ensemble', 'Vue d’ensemble', 'État (ICG, IAS) et réseau municipal ou supérieur'], ['regions', 'Régions', 'Nombre et composition par région administrative'],
+    ['age', 'Âge', 'Année de construction et état'], ['ouvrages', 'Caractéristiques', 'Longueurs, obstacles franchis, types, palmarès'],
+    ['suivi', 'Suivi et trafic', 'Inspections, restrictions, travaux et débits de circulation']];
+  var statsTab = 'ensemble';
+  try { var stv = localStorage.getItem('pq-stats-onglet'); if (ST_TABS.some(function(t){ return t[0] === stv; })) statsTab = stv; } catch (e) { /* idem */ }
+  function keySw(color){ return '<i class="key-sw" style="background:' + color + '" aria-hidden="true"></i>'; }
   function renderStats(){
     var vis = visible, el = statsEl, X = SIDX[statsIdx];
-    ensureClassesSite();
     if (!vis.length) { el.innerHTML = '<div class="card"><div class="empty">Aucune structure ne correspond aux filtres.</div></div>'; return; }
     var n = vis.length, icg = {}, ias = {}, comp = {}, dec = {}, types = {}, regs = {}, obs = {}, res = {}, lcl = [], ages = [];
     var lenSum = 0, lenN = 0, lens = [], widSum = 0, widN = 0;
     var today = new Date(), todayS = today.toISOString().slice(0, 10), overdue = 0, overdue1 = 0, noIg = 0, nextPi = {};
-    var limP = {}, limPn = 0, limHn = 0, travN = 0, djAll = 0, djN = 0, djK = {}, djList = [];
-    var CSD = window.PQ_CLASSE_SITE || null, cs = {}, csN = 0, regsRes = {};
+    var limP = {}, limPn = 0, limHn = 0, travN = 0, djAll = 0, djN = 0, djK = {}, djList = [], regsRes = {};
     ICG_ORDER.forEach(function(k){ icg[k] = 0; limP[k] = 0; }); IAS_ORDER.forEach(function(k){ ias[k] = 0; });
     X.order.forEach(function(k){ comp[k] = 0; djK[k] = 0; });
     var LBIN = [[0, 10, '< 10 m'], [10, 25, '10–25 m'], [25, 50, '25–50 m'], [50, 100, '50–100 m'], [100, 200, '100–200 m'], [200, 1e9, '≥ 200 m']];
@@ -3013,7 +3135,6 @@ table.list tbody tr:hover{background:#eef5f7}
       if (o.limH === 1) limHn++;
       if (o.travaux) travN++;
       if (det.d != null) { djAll += det.d; djN++; djK[ck] += det.d; djList.push([det.d, o]); }
-      if (CSD && !o.src && CSD[o.num]) { addTo(cs, CSD[o.num], ck); csN++; }
     });
     lens.sort(function(a, b){ return a - b; });
     ages.sort(function(a, b){ return a - b; });
@@ -3032,16 +3153,32 @@ table.list tbody tr:hover{background:#eef5f7}
     }
     function cntTxt(e){ return '<span class="rv"><b>' + nf.format(e.n) + '</b> <small>' + pct(e.n, n) + '</small></span>'; }
     function sym(c, title){ return symSvg(X.shape[c], X.color[c], 11, title); }
-    var KEY = '<p class="sub st-key">' + X.order.map(function(c){ return '<span>' + sym(c) + esc(X.lab(c)) + '</span>'; }).join('') + '</p>';
+    var P = { ensemble: '', regions: '', age: '', ouvrages: '', suivi: '' };
 
-    var LL = useLtb ? ' du tablier' : '';
-    var h = '<div class="st-top"><p class="st-scope">Statistiques sur <b>' + nf.format(n) + '</b> structure' + (n > 1 ? 's' : '') + ' (filtres actifs). Cliquer une tuile, une barre ou une ligne applique le filtre correspondant.</p>' +
-      '<div class="st-idx" role="group" aria-label="Indice des barres de composition"><span>Composition selon</span>' +
-      Object.keys(SIDX).map(function(k){ return '<button type="button" data-idx="' + k + '" aria-pressed="' + (k === statsIdx) + '">' + SIDX[k].name + '</button>'; }).join('') + '</div></div>';
+    // Bandeau : sous-onglets, indice des barres et sa légende (rectangles), toujours visibles en haut de la vue
+    var h = '<div class="st-bar"><nav class="st-tabs" role="tablist" aria-label="Catégories de statistiques">' + ST_TABS.map(function(t){
+      var on = t[0] === statsTab;
+      return '<button type="button" role="tab" id="st-tab-' + t[0] + '" data-stab="' + t[0] + '" aria-selected="' + on + '" aria-controls="st-pane" tabindex="' + (on ? 0 : -1) + '" title="' + esc(t[2]) + '">' + esc(t[1]) + '</button>';
+    }).join('') + '</nav><div class="st-keyrow"><div class="st-idx" role="group" aria-label="Indice des barres de composition"><span>Barres selon</span>' +
+      Object.keys(SIDX).map(function(k){ return '<button type="button" data-idx="' + k + '" aria-pressed="' + (k === statsIdx) + '">' + SIDX[k].name + '</button>'; }).join('') + '</div>' +
+      '<div class="st-key" role="list" aria-label="Légende des barres (' + X.name + '), de la pire classe à la meilleure">' + X.order.map(function(c){ return '<span role="listitem">' + keySw(X.color[c]) + esc(X.lab(c)) + '</span>'; }).join('') + '</div></div></div>' +
+      '<p class="st-scope">Statistiques sur <b>' + nf.format(n) + '</b> structure' + (n > 1 ? 's' : '') + ' (filtres actifs). Barres : de la pire classe ' + X.name + ' (gauche) à la meilleure. Cliquer une tuile, une barre ou une ligne applique le filtre correspondant.</p>';
 
-    // ---- 1. Réseau : municipal ou supérieur, avant l'état (v0.6.0, demande) ----
+    // ---- Vue d'ensemble : état, puis réseau municipal ou supérieur ----
+    P.ensemble += '<h2 class="st-h">État</h2><div class="metrics st-kpi">' +
+      ktile('ICG 1 — remplacement', nf.format(icg['1']), '', { icg: '1' }, pct(icg['1'], n)) +
+      ktile('ICG 2 — travaux majeurs', nf.format(icg['2']), '', { icg: '2' }, pct(icg['2'], n)) +
+      ktile('ICG 3 — réparations', nf.format(icg['3']), '', { icg: '3' }, pct(icg['3'], n)) +
+      ktile('Analyse en cours (AC)', nf.format(icg.AC), '', { icg: 'AC' }, pct(icg.AC, n)) +
+      ktile('Fermées', nf.format(ias.rouge), '', { ias: 'rouge' }, pct(ias.rouge, n)) +
+      ktile('Âge médian', ageMed != null ? nf.format(Math.round(ageMed)) : '—', ageMed != null ? 'ans' : '', null, nf.format(a50) + ' ont 50 ans ou plus') + '</div>';
+    P.ensemble += '<div class="stats-grid">' +
+      '<div class="card"><h2>Indice de condition générale (ICG)</h2><p class="sub">Part des ' + nf.format(n) + ' structures par classe</p>' +
+      stacked(ICG_ORDER, icg, n, ICG_COLOR, function(k){ return k === 'SO' ? 'S. O. / inconnu' : k + ' — ' + ICG_LABEL[k]; }, 'icg') + '</div>' +
+      '<div class="card"><h2>Indice d’accessibilité (IAS)</h2><p class="sub">Restrictions de circulation en vigueur</p>' +
+      stacked(IAS_ORDER, ias, n, IAS_COLOR, function(k){ return IAS_LABEL[k]; }, 'ias') + '</div></div>';
     var RES = [['Supérieur', 'superieur', 'réseau du MTMD : autoroutes, routes nationales, régionales et collectrices'], ['Municipal', 'municipal', 'ouvrages du MTMD sur le réseau des municipalités']];
-    h += '<h2 class="st-h">Réseau municipal ou supérieur</h2><div class="st-res">' + RES.map(function(r){
+    P.ensemble += '<h2 class="st-h">Réseau municipal ou supérieur</h2><div class="st-res">' + RES.map(function(r){
       var e = res[r[0]] || { n: 0, k: {} }, g = regsRes[r[0]] || {};
       return '<div class="card st-rescard clk"' + F({ reseau: r[1] }) + '><div class="st-resh"><h2>Réseau ' + esc(r[0].toLowerCase()) + '</h2><span class="st-resp">' + pct(e.n, n) + '</span></div>' +
         '<div class="st-big"><b>' + nf.format(e.n) + '</b> structure' + (e.n > 1 ? 's' : '') + '<small>' + esc(r[2]) + '</small></div>' +
@@ -3050,25 +3187,9 @@ table.list tbody tr:hover{background:#eef5f7}
         '<span><b>' + nf.format(g.fer || 0) + '</b> fermée' + ((g.fer || 0) > 1 ? 's' : '') + '</span>' +
         '<span><b>' + (g.an ? nf.format(Math.round(g.as / g.an)) : '—') + '</b> ans d’âge moyen</span>' +
         '<span><b>' + (g.ln ? nf1.format(g.ls / g.ln) : '—') + '</b> m de long. moy.</span></div></div>';
-    }).join('') + '</div><p class="sub st-key" style="margin-top:6px">' + X.order.map(function(c){ return '<span>' + sym(c) + esc(X.lab(c)) + '</span>'; }).join('') +
-      (res['Non précisé'] ? '<span>· ' + nf.format(res['Non précisé'].n) + ' sans réseau précisé</span>' : '') + '</p>';
+    }).join('') + '</div>' + (res['Non précisé'] ? '<p class="sub" style="margin-top:6px">' + nf.format(res['Non précisé'].n) + ' structure' + (res['Non précisé'].n > 1 ? 's' : '') + ' sans réseau précisé.</p>' : '');
 
-    // ---- 2. Vue d'ensemble (état) ----
-    h += '<h2 class="st-h">État</h2><div class="metrics st-kpi">' +
-      ktile('ICG 1 — remplacement', nf.format(icg['1']), '', { icg: '1' }, pct(icg['1'], n)) +
-      ktile('ICG 2 — travaux majeurs', nf.format(icg['2']), '', { icg: '2' }, pct(icg['2'], n)) +
-      ktile('ICG 3 — réparations', nf.format(icg['3']), '', { icg: '3' }, pct(icg['3'], n)) +
-      ktile('Analyse en cours (AC)', nf.format(icg.AC), '', { icg: 'AC' }, pct(icg.AC, n)) +
-      ktile('Fermées', nf.format(ias.rouge), '', { ias: 'rouge' }, pct(ias.rouge, n)) +
-      ktile('Âge médian', ageMed != null ? nf.format(Math.round(ageMed)) : '—', ageMed != null ? 'ans' : '', null, nf.format(a50) + ' ont 50 ans ou plus') + '</div>';
-    h += '<div class="stats-grid">';
-    h += '<div class="card"><h2>Indice de condition générale (ICG)</h2><p class="sub">Part des ' + nf.format(n) + ' structures par classe</p>' +
-      stacked(ICG_ORDER, icg, n, ICG_COLOR, function(k){ return k === 'SO' ? 'S. O. / inconnu' : k + ' — ' + ICG_LABEL[k]; }, ICG_SHAPE, 'icg') + '</div>';
-    h += '<div class="card"><h2>Indice d’accessibilité (IAS)</h2><p class="sub">Restrictions de circulation en vigueur</p>' +
-      stacked(IAS_ORDER, ias, n, IAS_COLOR, function(k){ return IAS_LABEL[k]; }, IAS_SHAPE, 'ias') + '</div>';
-    h += '</div>';
-
-    // ---- 2. Où ? ----
+    // ---- Régions ----
     var rk = Object.keys(regs).sort(function(a, b){ return regs[b].n - regs[a].n; });
     var tot = { n: n, k: comp, fer: 0, as: 0, an: 0, ls: lenSum, ln: lenN, ws: widSum, wn: widN };
     rk.forEach(function(k){ var g = regs[k]; tot.fer += g.fer || 0; tot.as += g.as || 0; tot.an += g.an || 0; });
@@ -3078,8 +3199,8 @@ table.list tbody tr:hover{background:#eef5f7}
         (g.an ? nf1.format(g.as / g.an) : '—') + '</td><td>' + (g.ln ? nf1.format(g.ls / g.ln) : '—') + '</td><td>' + (g.wn ? nf1.format(g.ws / g.wn) : '—') + '</td></tr>';
     }
     var TH = X.order.map(function(c){ return '<th>' + esc(X.lab(c)) + '</th>'; }).join('');
-    h += '<h2 class="st-h">Où ?</h2><div class="card wide"><h2>Régions administratives</h2>' +
-      '<p class="sub">Nombre de structures et composition par classe ' + X.name + ', de la pire (gauche) à la meilleure</p>' + KEY + '<div class="rlist">' +
+    P.regions += '<div class="card wide"><h2>Régions administratives</h2>' +
+      '<p class="sub">Nombre de structures et composition par classe ' + X.name + ', de la pire (gauche) à la meilleure</p><div class="rlist">' +
       rk.map(function(k){
         var g = regs[k];
         return '<div class="rrow"' + (k !== 'Non précisée' ? F({ region: k }) : '') + '><span class="rl">' + esc(k) + '</span>' + compStack(g.k, g.n) + cntTxt(g) + '</div>';
@@ -3087,110 +3208,53 @@ table.list tbody tr:hover{background:#eef5f7}
       '<details class="tbl-twin"><summary>Voir en tableau (classes, âge, dimensions, fermées)</summary><div class="tscroll"><table class="tbl"><thead><tr><th>Région</th><th>Structures</th>' + TH + '<th>Fermées</th><th>Âge moyen</th><th>Long. moy.</th><th>Larg. moy.</th></tr></thead><tbody>' +
       rk.map(function(k){ return row(k, regs[k]); }).join('') + '</tbody><tfoot>' + row('Ensemble', tot) + '</tfoot></table></div></details></div>';
 
-    // ---- Sol : classes de site sismique (v0.6.0) ----
-    var CK = couche('sismique'), KC = CK && (CK.classes || CK.mtl), csCol = {}, csLab = {};
-    if (KC) KC.classes.forEach(function(c){ csCol[c.k] = c.color; csLab[c.k] = c.label; });
-    h += '<h2 class="st-h">Sol : classe de site sismique</h2><div class="card wide"><h2>Classes de site A à E des ouvrages filtrés</h2>';
-    if (!CSD) h += '<div class="empty">' + (csState === 3 ? 'Classes de site indisponibles (fichier data/classes-site.js absent).' : 'Chargement des classes de site…') + '</div>';
-    else {
-      var CSM = KC && KC.url ? KC : (CSD._ || {});        // citation courte de la couche (lien), pas la référence complète
-      h += '<p class="sub">Classe de site estimée au point de chaque ouvrage (Vs30 sur 30 m, CNBC) : ' + nf.format(csN) + ' ouvrages classés sur ' + nf.format(n) +
-        ' (' + pct(csN, n) + '). Estimation régionale, pas une étude de site. Source : ' +
-        (CSM.url ? '<a href="' + esc(CSM.url) + '" target="_blank" rel="noopener">' + esc(CSM.source || 'article') + '</a>' : esc(CSM.source || '—')) +
-        (CSD._ && CSD._.mtl ? ' ; région de Montréal (' + nf.format(CSD._.mtl.n.length) + ' ouvrages, prioritaire) : <a href="' + esc(CSD._.mtl.url) + '" target="_blank" rel="noopener">' + esc(CSD._.mtl.source) + '</a>' : '') + '.</p>';
-      h += '<div class="sbar" role="img" aria-label="Répartition par classe de site">' + CS_ORDER.map(function(k){
-        var e = cs[k]; return e ? '<span style="flex:' + e.n + ' 1 0;background:' + (csCol[k] || NA) + '" data-tip="' + esc('Classe ' + k + ' : ' + nf.format(e.n) + ' (' + pct(e.n, csN) + ')') + '"></span>' : '';
-      }).join('') + '</div>' + KEY + '<div class="rlist" style="margin-top:6px">' + CS_ORDER.filter(function(k){ return cs[k]; }).map(function(k){
-        var e = cs[k];
-        return '<div class="rrow nc"><span class="rl"><i class="cs-sw" style="background:' + (csCol[k] || NA) + '"></i>' + esc(csLab[k] || 'Classe ' + k) + '</span>' + compStack(e.k, e.n) +
-          '<span class="rv"><b>' + nf.format(e.n) + '</b> <small>' + pct(e.n, csN) + '</small></span></div>';
-      }).join('') + '</div>';
-    }
-    h += '</div>';
-
-    // ---- 3. Âge ----
+    // ---- Âge ----
     var dk = Object.keys(dec).map(Number).sort(function(a, b){ return a - b; });
-    h += '<h2 class="st-h">Âge</h2><div class="card wide"><h2>Année de construction et état</h2><p class="sub">Nombre de structures par période de construction (total au-dessus de chaque barre), empilé par classe ' + X.name + '. ' +
-      nf.format(a50) + ' structures (' + pct(a50, ages.length) + ') ont 50 ans ou plus, ' + nf.format(a100) + ' ont 100 ans ou plus.</p>' + KEY;
+    P.age += '<div class="card wide"><h2>Année de construction et état</h2><p class="sub">Nombre de structures par période de construction (total au-dessus de chaque barre), empilé par classe ' + X.name + '. ' +
+      nf.format(a50) + ' structures (' + pct(a50, ages.length) + ') ont 50 ans ou plus, ' + nf.format(a100) + ' ont 100 ans ou plus. Âge médian : ' + (ageMed != null ? nf.format(Math.round(ageMed)) + ' ans' : '—') + '.</p>';
     if (dk.length) {
       var d0 = dk[0], d1 = Math.floor(YEAR / 10) * 10, bins = [], mx = 0;
       for (var d = d0; d <= d1; d += (d === 1800 ? 100 : 10)) { var v = dec[d] || { n: 0, k: {} }; bins.push({ d: d, n: v.n, k: v.k }); if (v.n > mx) mx = v.n; }
       var top = niceMax(mx), TOPDOWN = X.order.slice().reverse();
-      h += '<div class="hist" role="img" aria-label="Histogramme du nombre de structures par décennie de construction, par classe ' + X.name + '">';
-      [0, 0.5, 1].forEach(function(f){ h += '<div class="gl" style="bottom:' + (f * 100) + '%"><span>' + nf.format(Math.round(top * f)) + '</span></div>'; });
-      h += '<div class="hcols">';
+      P.age += '<div class="hist" role="img" aria-label="Histogramme du nombre de structures par décennie de construction, par classe ' + X.name + '">';
+      [0, 0.5, 1].forEach(function(f){ P.age += '<div class="gl" style="bottom:' + (f * 100) + '%"><span>' + nf.format(Math.round(top * f)) + '</span></div>'; });
+      P.age += '<div class="hcols">';
       bins.forEach(function(b){
         var lab = binLabel(b.d), tipTxt = nf.format(b.n) + ' structure' + (b.n > 1 ? 's' : '') + ' · ' + lab + '\n' +
           X.order.filter(function(c){ return b.k[c]; }).map(function(c){ return X.lab(c) + ' : ' + nf.format(b.k[c]); }).join(' · ');
         var f = b.d === 1800 ? { amin: '', amax: '1900' } : { amin: String(b.d), amax: String(b.d + 10) };
-        h += '<div class="hcol"' + F(f) + ' data-tip="' + esc(tipTxt) + '" aria-label="' + esc(lab + ' : ' + b.n + ' structures') + '">';
+        P.age += '<div class="hcol"' + F(f) + ' data-tip="' + esc(tipTxt) + '" aria-label="' + esc(lab + ' : ' + b.n + ' structures') + '">';
         if (b.n) {
-          h += '<div class="hbar" style="height:' + (100 * b.n / top) + '%"><span class="hv">' + nf.format(b.n) + '</span>';
-          TOPDOWN.forEach(function(c){ if (b.k[c]) h += '<span style="flex:' + b.k[c] + ' 1 0;background:' + X.color[c] + '"></span>'; });
-          h += '</div>';
+          P.age += '<div class="hbar" style="height:' + (100 * b.n / top) + '%"><span class="hv">' + nf.format(b.n) + '</span>';
+          TOPDOWN.forEach(function(c){ if (b.k[c]) P.age += '<span style="flex:' + b.k[c] + ' 1 0;background:' + X.color[c] + '"></span>'; });
+          P.age += '</div>';
         }
-        h += '</div>';
+        P.age += '</div>';
       });
-      h += '</div></div><div class="hx">' + bins.map(function(b){ return '<span>' + esc(binLabel(b.d, true)) + '</span>'; }).join('') + '</div>';
-      h += '<details class="tbl-twin"><summary>Voir en tableau</summary><div class="tscroll"><table class="tbl"><thead><tr><th>Décennie</th><th>Structures</th>' + TH + '</tr></thead><tbody>' +
+      P.age += '</div></div><div class="hx">' + bins.map(function(b){ return '<span>' + esc(binLabel(b.d, true)) + '</span>'; }).join('') + '</div>';
+      P.age += '<details class="tbl-twin"><summary>Voir en tableau</summary><div class="tscroll"><table class="tbl"><thead><tr><th>Décennie</th><th>Structures</th>' + TH + '</tr></thead><tbody>' +
         bins.map(function(b){ return '<tr><td>' + esc(binLabel(b.d)) + '</td><td>' + nf.format(b.n) + '</td>' + cells(b) + '</tr>'; }).join('') + '</tbody></table></div></details>';
-    } else h += '<div class="empty">Aucune année de construction renseignée.</div>';
-    h += '</div>';
+    } else P.age += '<div class="empty">Aucune année de construction renseignée.</div>';
+    P.age += '</div>';
 
-    // ---- 4. Suivi ----
-    h += '<h2 class="st-h">Suivi</h2><div class="stats-grid">';
-    var pk = Object.keys(nextPi).map(Number).sort(function(a, b){ return a - b; }), pmx = 1;
-    pk.forEach(function(y){ if (nextPi[y] > pmx) pmx = nextPi[y]; });
-    h += '<div class="card"><h2>Inspections générales</h2><p class="sub">Échéance = dernière inspection générale + fréquence indiquée dans la fiche</p>' +
-      '<div class="st-big"><b>' + nf.format(overdue) + '</b> échues au ' + esc(todayS) + ' <small>dont ' + nf.format(overdue1) + ' depuis plus d’un an</small></div>' +
-      (noIg ? '<p class="sub">' + nf.format(noIg) + ' pont' + (noIg > 1 ? 's' : '') + ' sans date ou fréquence d’inspection.</p>' : '') +
-      '<div class="rlist">' + pk.map(function(y){
-        return '<div class="rrow nc"><span class="rl">Prochaine en ' + y + '</span><div class="pbar" aria-hidden="true"><span style="width:' + (100 * nextPi[y] / pmx) + '%;background:#4e79a7"></span></div><span class="rv"><b>' + nf.format(nextPi[y]) + '</b></span></div>';
-      }).join('') + '</div></div>';
-    var lpMax = 0; ICG_ORDER.forEach(function(k){ if (icg[k]) lpMax = Math.max(lpMax, 100 * limP[k] / icg[k]); });
-    h += '<div class="card"><h2>Restrictions et travaux</h2><p class="sub">Part des structures avec un panneau de limitation de poids, par classe ICG</p><div class="rlist">' +
-      ICG_ORDER.filter(function(k){ return icg[k]; }).map(function(k){
-        var p = 100 * limP[k] / icg[k];
-        return '<div class="rrow"' + F({ icg: k, lp: true }) + '><span class="rl">' + symIcg(k, 11) + (k === 'SO' ? 'S. O.' : 'ICG ' + k) + '</span><div class="pbar" aria-hidden="true"><span style="width:' + (lpMax ? Math.max(p ? 1.5 : 0, 100 * p / lpMax) : 0) + '%;background:#4e79a7"></span></div>' +
-          '<span class="rv"><b>' + pct(limP[k], icg[k]) + '</b> <small>' + nf.format(limP[k]) + ' / ' + nf.format(icg[k]) + '</small></span></div>';
-      }).join('') + '</div>' +
-      '<div class="st-row2"><div' + F({ lp: true }) + ' class="st-mini clk"><b>' + nf.format(limPn) + '</b> limitation de poids</div><div class="st-mini"><b>' + nf.format(limHn) + '</b> hauteur libre limitée</div>' +
-      '<div class="st-mini"><b>' + nf.format(travN) + '</b> avec une année de travaux inscrite</div></div></div>';
-    h += '</div>';
-
-    // ---- 5. Exposition au trafic ----
-    djList.sort(function(a, b){ return b[0] - a[0]; });
-    var cntDj = {}; djList.forEach(function(x){ var c = X.key(x[1]); cntDj[c] = (cntDj[c] || 0) + 1; });
-    h += '<h2 class="st-h">Exposition au trafic</h2><div class="card wide"><h2>Trafic journalier selon la classe ' + X.name + '</h2>' +
-      '<p class="sub">Somme des DJMA des fiches (' + nf.format(djN) + ' structures renseignées, ' + nf.format(Math.round(djAll)) + ' véhicules/jour cumulés) : chaque sens d’une autoroute est un ouvrage distinct.</p>' + KEY +
-      '<div class="rlist"><div class="rrow nc"><span class="rl">Part du trafic</span>' + compStack(djK, djAll, ' véh./j') + '<span class="rv"><small>DJMA cumulé</small></span></div>' +
-      '<div class="rrow nc"><span class="rl">Part des ouvrages</span>' + compStack(cntDj, djN) + '<span class="rv"><small>en nombre</small></span></div></div>' +
-      '<div class="tscroll"><table class="tbl"><thead><tr><th>Classe</th><th>Ouvrages</th><th>% des ouvrages</th><th>DJMA cumulé</th><th>% du trafic</th></tr></thead><tbody>' +
-      X.order.filter(function(c){ return cntDj[c]; }).map(function(c){
-        return '<tr><td>' + sym(c) + esc(X.lab(c)) + '</td><td>' + nf.format(cntDj[c]) + '</td><td>' + pct(cntDj[c], djN) + '</td><td>' + nf.format(Math.round(djK[c])) + '</td><td>' + pct(djK[c], djAll) + '</td></tr>';
-      }).join('') + '</tbody></table></div>' +
-      (djList.length ? '<h3 class="st-h3">Les 10 ouvrages les plus achalandés</h3><ol class="toplist">' + djList.slice(0, 10).map(function(x){
-        var o = x[1], c = X.key(o);
-        return '<li data-num="' + esc(o.num) + '" tabindex="0" role="button"><span class="tn2">' + sym(c, X.lab(c)) + esc(o.num) + '</span><span class="tl2">' + esc([o.nom, o.route, o.muncp].filter(Boolean).join(' · ')) + '</span><span class="tv2">' + nf.format(x[0]) + ' véh./j</span></li>';
-      }).join('') + '</ol>' : '<div class="empty">Aucun DJMA renseigné.</div>') + '</div>';
-
-    // ---- 6. Caractéristiques ----
-    h += '<h2 class="st-h">Caractéristiques</h2><div class="stats-grid">';
-    h += '<div class="card"><h2>Longueur' + esc(LL) + '</h2><p class="sub">Médiane ' + (med != null ? nf1.format(med) + ' m' : '—') + ' · cumulée ' + (lenN ? nf1.format(lenSum / 1000) + ' km' : '—') + ' · largeur moyenne ' + (widN ? nf1.format(widSum / widN) + ' m' : '—') + '</p>' + KEY + '<div class="rlist">' +
+    // ---- Caractéristiques : longueurs, obstacles, types, palmarès ----
+    var LL = useLtb ? ' du tablier' : '';
+    P.ouvrages += '<div class="stats-grid">';
+    P.ouvrages += '<div class="card"><h2>Longueur' + esc(LL) + '</h2><p class="sub">Médiane ' + (med != null ? nf1.format(med) + ' m' : '—') + ' · cumulée ' + (lenN ? nf1.format(lenSum / 1000) + ' km' : '—') + ' · largeur moyenne ' + (widN ? nf1.format(widSum / widN) + ' m' : '—') + '</p><div class="rlist">' +
       LBIN.map(function(b, i){
         var e = lcl[i];
         return '<div class="rrow nc"><span class="rl">' + esc(b[2]) + '</span>' + compStack(e.k, e.n) + cntTxt(e) + '</div>';
       }).join('') + '</div></div>';
     function catCard(title, sub, map, fkey, fval){
       var ks = Object.keys(map).sort(function(a, b){ return map[b].n - map[a].n; });
-      return '<div class="card"><h2>' + esc(title) + '</h2><p class="sub">' + esc(sub) + '</p>' + KEY + '<div class="rlist">' + ks.map(function(k){
+      return '<div class="card"><h2>' + esc(title) + '</h2><p class="sub">' + esc(sub) + '</p><div class="rlist">' + ks.map(function(k){
         var e = map[k], fv = fval ? fval(k) : k;
         return '<div class="rrow"' + (fv && k !== 'Non précisé' ? F((function(){ var o = {}; o[fkey] = fv; return o; })()) : '') + '><span class="rl">' + esc(k) + '</span>' + compStack(e.k, e.n) + cntTxt(e) + '</div>';
       }).join('') + '</div></div>';
     }
-    h += catCard('Obstacle franchi', 'Nombre et composition ' + X.name + ' par type d’obstacle', obs, 'ob');
+    P.ouvrages += catCard('Obstacle franchi', 'Nombre et composition ' + X.name + ' par type d’obstacle', obs, 'ob');
     var tk = Object.keys(types).sort(function(a, b){ return types[b].n - types[a].n; }).slice(0, 12);
-    h += '<div class="card"><h2>Types les plus fréquents</h2><p class="sub">12 premiers · effectif et composition ' + X.name + '</p>' + KEY + '<div class="rlist">' + tk.map(function(c){
+    P.ouvrages += '<div class="card"><h2>Types les plus fréquents</h2><p class="sub">12 premiers · effectif et composition ' + X.name + '</p><div class="rlist">' + tk.map(function(c){
       var e = types[c], lab = c === 'null' ? 'Type inconnu' : (D.types[c] ? D.types[c][0] : c);
       return '<div class="rrow ty"' + (c !== 'null' ? F({ types: [c] }) : '') + ' title="' + esc(lab + ' — type ' + c) + '"><span class="rl">' + icon(c, 12) + '<span>' + esc(lab) + '</span></span>' + compStack(e.k, e.n) + cntTxt(e) + '</div>';
     }).join('') + '</div></div>';
@@ -3203,13 +3267,51 @@ table.list tbody tr:hover{background:#eef5f7}
         return '<li data-num="' + esc(o.num) + '" tabindex="0" role="button"><span class="tn2">' + sym(c, X.lab(c)) + esc(o.num) + '</span><span class="tl2">' + esc([o.nom, o.muncp].filter(Boolean).join(' · ') || o.tl || '') + '</span><span class="tv2">' + val(o) + '</span></li>';
       }).join('') + '</ol>';
     }
-    h += '<div class="card"><h2>Palmarès</h2><p class="sub">Les plus longs' + esc(LL) + ' et les plus anciens de la sélection</p>' +
+    P.ouvrages += '<div class="card"><h2>Palmarès</h2><p class="sub">Les plus longs' + esc(LL) + ' et les plus anciens de la sélection</p>' +
       pal(longest, function(o){ return nf1.format(LEN(o)) + ' m'; }) + pal(oldest, function(o){ return String(o.annee); }) + '</div>';
-    h += '</div>';
-    el.innerHTML = h;
+    P.ouvrages += '</div>';
+
+    // ---- Suivi et trafic ----
+    P.suivi += '<h2 class="st-h">Inspections, restrictions et travaux</h2><div class="stats-grid">';
+    var pk = Object.keys(nextPi).map(Number).sort(function(a, b){ return a - b; }), pmx = 1;
+    pk.forEach(function(y){ if (nextPi[y] > pmx) pmx = nextPi[y]; });
+    P.suivi += '<div class="card"><h2>Inspections générales</h2><p class="sub">Échéance = dernière inspection générale + fréquence indiquée dans la fiche</p>' +
+      '<div class="st-big"><b>' + nf.format(overdue) + '</b> échues au ' + esc(todayS) + ' <small>dont ' + nf.format(overdue1) + ' depuis plus d’un an</small></div>' +
+      (noIg ? '<p class="sub">' + nf.format(noIg) + ' pont' + (noIg > 1 ? 's' : '') + ' sans date ou fréquence d’inspection.</p>' : '') +
+      '<div class="rlist">' + pk.map(function(y){
+        return '<div class="rrow nc"><span class="rl">Prochaine en ' + y + '</span><div class="pbar" aria-hidden="true"><span style="width:' + (100 * nextPi[y] / pmx) + '%;background:#4e79a7"></span></div><span class="rv"><b>' + nf.format(nextPi[y]) + '</b></span></div>';
+      }).join('') + '</div></div>';
+    var lpMax = 0; ICG_ORDER.forEach(function(k){ if (icg[k]) lpMax = Math.max(lpMax, 100 * limP[k] / icg[k]); });
+    P.suivi += '<div class="card"><h2>Restrictions et travaux</h2><p class="sub">Part des structures avec un panneau de limitation de poids, par classe ICG</p><div class="rlist">' +
+      ICG_ORDER.filter(function(k){ return icg[k]; }).map(function(k){
+        var p = 100 * limP[k] / icg[k];
+        return '<div class="rrow"' + F({ icg: k, lp: true }) + '><span class="rl">' + keySw(ICG_COLOR[k]) + (k === 'SO' ? 'S. O.' : 'ICG ' + k) + '</span><div class="pbar" aria-hidden="true"><span style="width:' + (lpMax ? Math.max(p ? 1.5 : 0, 100 * p / lpMax) : 0) + '%;background:#4e79a7"></span></div>' +
+          '<span class="rv"><b>' + pct(limP[k], icg[k]) + '</b> <small>' + nf.format(limP[k]) + ' / ' + nf.format(icg[k]) + '</small></span></div>';
+      }).join('') + '</div>' +
+      '<div class="st-row2"><div' + F({ lp: true }) + ' class="st-mini clk"><b>' + nf.format(limPn) + '</b> limitation de poids</div><div class="st-mini"><b>' + nf.format(limHn) + '</b> hauteur libre limitée</div>' +
+      '<div class="st-mini"><b>' + nf.format(travN) + '</b> avec une année de travaux inscrite</div></div></div>';
+    P.suivi += '</div>';
+    djList.sort(function(a, b){ return b[0] - a[0]; });
+    var cntDj = {}; djList.forEach(function(x){ var c = X.key(x[1]); cntDj[c] = (cntDj[c] || 0) + 1; });
+    P.suivi += '<h2 class="st-h">Exposition au trafic</h2><div class="card wide"><h2>Trafic journalier selon la classe ' + X.name + '</h2>' +
+      '<p class="sub">Somme des DJMA des fiches (' + nf.format(djN) + ' structures renseignées, ' + nf.format(Math.round(djAll)) + ' véhicules/jour cumulés) : chaque sens d’une autoroute est un ouvrage distinct.</p>' +
+      '<div class="rlist"><div class="rrow nc"><span class="rl">Part du trafic</span>' + compStack(djK, djAll, ' véh./j') + '<span class="rv"><small>DJMA cumulé</small></span></div>' +
+      '<div class="rrow nc"><span class="rl">Part des ouvrages</span>' + compStack(cntDj, djN) + '<span class="rv"><small>en nombre</small></span></div></div>' +
+      '<div class="tscroll"><table class="tbl"><thead><tr><th>Classe</th><th>Ouvrages</th><th>% des ouvrages</th><th>DJMA cumulé</th><th>% du trafic</th></tr></thead><tbody>' +
+      X.order.filter(function(c){ return cntDj[c]; }).map(function(c){
+        return '<tr><td>' + keySw(X.color[c]) + esc(X.lab(c)) + '</td><td>' + nf.format(cntDj[c]) + '</td><td>' + pct(cntDj[c], djN) + '</td><td>' + nf.format(Math.round(djK[c])) + '</td><td>' + pct(djK[c], djAll) + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      (djList.length ? '<h3 class="st-h3">Les 10 ouvrages les plus achalandés</h3><ol class="toplist">' + djList.slice(0, 10).map(function(x){
+        var o = x[1], c = X.key(o);
+        return '<li data-num="' + esc(o.num) + '" tabindex="0" role="button"><span class="tn2">' + sym(c, X.lab(c)) + esc(o.num) + '</span><span class="tl2">' + esc([o.nom, o.route, o.muncp].filter(Boolean).join(' · ')) + '</span><span class="tv2">' + nf.format(x[0]) + ' véh./j</span></li>';
+      }).join('') + '</ol>' : '<div class="empty">Aucun DJMA renseigné.</div>') + '</div>';
+
+    el.innerHTML = h + '<div class="st-pane" id="st-pane" role="tabpanel" aria-labelledby="st-tab-' + statsTab + '">' + P[statsTab] + '</div>';
   }
   // Statistiques cliquables : une tuile, une barre ou une ligne applique un filtre ; un ouvrage ouvre sa fiche
   function statsAct(t){
+    var tb = t.closest('[data-stab]');
+    if (tb) { setStatsTab(tb.getAttribute('data-stab')); return; }
     var ix = t.closest('[data-idx]');
     if (ix) {
       statsIdx = ix.getAttribute('data-idx');
@@ -3227,8 +3329,21 @@ table.list tbody tr:hover{background:#eef5f7}
     for (var k in f) state[k] = f[k];
     stateToUI(); buildTypeOptions(); writeHash(); apply();
   }
+  // v0.6.7 : sous-onglet choisi gardé d'une visite à l'autre ; flèches gauche / droite dans la barre des sous-onglets
+  function setStatsTab(k){
+    statsTab = k;
+    try { localStorage.setItem('pq-stats-onglet', k); } catch (e) { /* idem */ }
+    renderStats(); statsEl.scrollTop = 0;
+    var bt = statsEl.querySelector('[data-stab="' + k + '"]'); if (bt) bt.focus();
+  }
   statsEl.addEventListener('click', function(e){ statsAct(e.target); });
-  statsEl.addEventListener('keydown', function(e){ if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-f],[data-num]')) { e.preventDefault(); statsAct(e.target); } });
+  statsEl.addEventListener('keydown', function(e){
+    if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && e.target.matches('[data-stab]')) {
+      var i = ST_TABS.map(function(t){ return t[0]; }).indexOf(statsTab) + (e.key === 'ArrowRight' ? 1 : -1);
+      e.preventDefault(); setStatsTab(ST_TABS[(i + ST_TABS.length) % ST_TABS.length][0]); return;
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-f],[data-num]')) { e.preventDefault(); statsAct(e.target); }
+  });
   function tile(label, value, unit){ return '<div class="metric"><div class="metric-label">' + esc(label) + '</div><div class="metric-value">' + esc(value) + (unit ? ' <small>' + esc(unit) + '</small>' : '') + '</div></div>'; }
   function niceMax(m){
     var p = Math.pow(10, Math.floor(Math.log10(Math.max(m, 1)))), f = m / p;
@@ -3236,13 +3351,14 @@ table.list tbody tr:hover{background:#eef5f7}
     return nice * p;
   }
   function binLabel(d, short){ return d === 1800 ? (short ? '<1900' : 'Avant 1900') : (short ? String(d) : d + 's'); }
-  function stacked(order, counts, n, colors, labelFn, shapes, fkey){
+  // v0.6.7 : légende en rectangles de couleur (avant : petits symboles de la carte), comme les barres
+  function stacked(order, counts, n, colors, labelFn, fkey){
     var bar = '<div class="sbar" role="img" aria-label="Répartition">', lg = '<div class="lg">';
     order.forEach(function(k){
       var c = counts[k], lab = labelFn(k);
       if (c) bar += '<span style="flex:' + c + ' 1 0;background:' + colors[k] + '" data-tip="' + esc(nf.format(c) + ' structures (' + pct(c, n) + ')\n' + lab) + '"></span>';
       var fa = fkey && c ? ' class="clk" tabindex="0" role="button" data-f="' + esc(JSON.stringify((function(){ var q = {}; q[fkey] = k; return q; })())) + '"' : '';
-      lg += symSvg(shapes ? shapes[k] : 'circle', colors[k]) + '<span' + fa + '>' + esc(lab) + '</span><span class="n">' + nf.format(c) + '</span><span class="p">' + pct(c, n) + '</span>';
+      lg += keySw(colors[k]) + '<span' + fa + '>' + esc(lab) + '</span><span class="n">' + nf.format(c) + '</span><span class="p">' + pct(c, n) + '</span>';
     });
     return bar + '</div>' + lg + '</div>';
   }
@@ -3464,6 +3580,12 @@ table.list tbody tr:hover{background:#eef5f7}
         return;
       }
       if (ov.key === 'pga' || ov.key === 'classes') { h += lgDet(ov, sismiqueLegend(C, ov.key)); return; }
+      if (ov.key === 'cameras') {
+        h += '<div class="lg-sub">Caméras de circulation</div><div class="lg-chips"><span>' + camSvg(15) + nf.format(C.cameras.length) + ' caméras : ' + (CAM_TOUCH ? 'toucher' : 'survol') + ' = vidéo en direct, ' +
+          (CAM_TOUCH ? 'puis lien' : 'clic') + ' = carte de Québec 511</span></div><div class="lg-src">Positions : <a href="' + esc(C.source) + '" target="_blank" rel="noopener">MTMD, Données Québec</a> (CC BY 4.0) · ' +
+          'images © Québec 511, affichées en direct, sans enregistrement (<a href="' + esc(C.conditions) + '" target="_blank" rel="noopener">conditions</a>)</div>';
+        return;
+      }
       if (ov.key === 'degel') { h += lgDet(ov, degelLegend(C)); return; }
       if (ov.key === 'wikiponts') {
         h += '<div class="lg-sub">Ponts remarquables</div><div class="lg-chips"><span>' + starSvg(14) + nf.format(C.ponts.length) + ' ouvrages hors MTMD (Wikipédia) · <button type="button" class="lg-rq" data-rq>voir la liste</button></span></div>';
@@ -3508,6 +3630,8 @@ table.list tbody tr:hover{background:#eef5f7}
       if (G) G.points.forEach(function(p){ g.addLayer(geoMarker(p, false)); });
       return g;
     } },
+    // v0.6.7 : caméras de circulation de Québec 511 (désactivées par défaut), vidéo en direct au survol
+    { key: 'cameras', name: 'Caméras de circulation (Québec 511)', sub: '≈ 680 caméras · vidéo en direct au survol', src: 'data/couche-cameras.js', z: 4, build: buildCameras },
     // filtre : case à cocher du panneau des filtres (v0.6.0), absente du panneau des couches
     { key: 'forestiers', name: 'Autres ponts hors MTMD (forestiers, municipaux… ; AQréseau+)', filtre: true, src: 'data/couche-forestiers.js', z: 1.5, build: buildForestiers },
     // Aléa sismique en deux couches superposables (v0.6.0) : PGA de la province et classes de site du Québec
@@ -3528,6 +3652,7 @@ table.list tbody tr:hover{background:#eef5f7}
     if (geoNear) groups.push({ z: 2.5, paths: flatPaths(geoNear) });          // sondages proches, au-dessus de la couche complète
     groups.sort(function(a, b){ return b.z - a.z; });                          // le dernier envoyé au fond finit tout en bas
     groups.forEach(function(g){ for (var i = g.paths.length - 1; i >= 0; i--) g.paths[i].bringToBack(); });
+    camsFront();
   }
   function saveOverlays(){
     var on = OVERLAYS.filter(function(ov){ return map.hasLayer(ov.layer); }).map(function(ov){ return ov.key; });
@@ -3700,7 +3825,7 @@ table.list tbody tr:hover{background:#eef5f7}
   // ---------- Démarrage ----------
   // Photos du MTMD mises en cache par sw.js (le serveur n'envoie aucun en-tête de cache) ; http(s) seulement
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js?v=' + encodeURIComponent((D && D.generated) || '0')).catch(function(){ /* facultatif */ });
-  ['#drawer', '.metrics', '#inputs', '#view-stats', '#news', '#lidar-dialog', '#aux-dialog'].forEach(function(q){ watchGloss(document.querySelector(q)); });
+  ['#drawer', '.metrics', '#inputs', '#view-stats', '#view-news', '#lidar-dialog', '#aux-dialog'].forEach(function(q){ watchGloss(document.querySelector(q)); });
   hashToState();
   stateToUI();
   var startView = view, startSel = selNum;

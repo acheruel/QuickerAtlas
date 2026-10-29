@@ -1,0 +1,125 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": 3998,
+   "properties": {
+    "IDEcamera": "3998",
+    "NumeroCamera": "Q5413",
+    "DescriptionLocalisationFr": "Aut. 540 (direction ouest) à la hauteur du boul. Wilfrid-Hamel",
+    "DescriptionLocalisationEn": "Aut. 540 (westward) at boul. Wilfrid-Hamel",
+    "DateDebutDiffusion": "2023/12/14",
+    "NumeroRoute": "00540",
+    "NomRegionDiffusion": "Québec (Capitale-Nationale)",
+    "OrdreAffichage": "0",
+    "NomPosteFrontalier": "",
+    "NomPontFrontalier": "",
+    "URL_FLUX_DONNEE": "https://www.quebec511.info/Carte/Fenetres/FenetreVideo.html?id=3998"
+   },
+   "bbox": [
+    -71.35488,
+    46.78853,
+    -71.35488,
+    46.78853
+   ],
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -71.35488,
+     46.78853
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3542,
+   "properties": {
+    "IDEcamera": "3542",
+    "NumeroCamera": "M1330004",
+    "DescriptionLocalisationFr": "Route 133 à la hauteur du poste frontalier de Saint-Armand/Philipsburg",
+    "DescriptionLocalisationEn": "Route 133 at Saint-Armand/Philipsburg border crossing",
+    "DateDebutDiffusion": "2011/10/31",
+    "NumeroRoute": "00133",
+    "NomRegionDiffusion": "Estrie",
+    "OrdreAffichage": "1",
+    "NomPosteFrontalier": "St-Armand/Philipsburg",
+    "NomPontFrontalier": "",
+    "URL_FLUX_DONNEE": "https://www.quebec511.info/Carte/Fenetres/FenetreVideo.html?id=3542"
+   },
+   "bbox": [
+    -73.0845,
+    45.0194,
+    -73.0845,
+    45.0194
+   ],
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.0845,
+     45.0194
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 3455,
+   "properties": {
+    "IDEcamera": "3455",
+    "NumeroCamera": "Q7311",
+    "DescriptionLocalisationFr": "Aut. 73 sur le pont Pierre-Laporte (côté Québec)",
+    "DescriptionLocalisationEn": "Aut. 73 on pont Pierre-Laporte (Québec side)",
+    "DateDebutDiffusion": "2011/10/31",
+    "NumeroRoute": "00073",
+    "NomRegionDiffusion": "Québec (Capitale-Nationale)",
+    "OrdreAffichage": "1",
+    "NomPosteFrontalier": "",
+    "NomPontFrontalier": "Pont Pierre-Laporte",
+    "URL_FLUX_DONNEE": "https://www.quebec511.info/Carte/Fenetres/FenetreVideo.html?id=3455"
+   },
+   "bbox": [
+    -71.29205,
+    46.74805,
+    -71.29205,
+    46.74805
+   ],
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -71.29205,
+     46.74805
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 4057,
+   "properties": {
+    "IDEcamera": "4057",
+    "NumeroCamera": "T2410101",
+    "DescriptionLocalisationFr": "Route 241 à la hauteur du boulevard de Bromont (Bromont)",
+    "DescriptionLocalisationEn": "Route 241 at boulevard de Bromont (Bromont)",
+    "DateDebutDiffusion": "2025/01/17",
+    "NumeroRoute": "00241",
+    "NomRegionDiffusion": "Estrie",
+    "OrdreAffichage": "0",
+    "NomPosteFrontalier": "",
+    "NomPontFrontalier": "",
+    "URL_FLUX_DONNEE": "https://www.quebec511.info/Carte/Fenetres/FenetreVideo.html?id=4057"
+   },
+   "bbox": [
+    -72.64774,
+    45.32044,
+    -72.64774,
+    45.32044
+   ],
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -72.64774,
+     45.32044
+    ]
+   }
+  }
+ ]
+}

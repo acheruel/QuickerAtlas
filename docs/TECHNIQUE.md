@@ -39,7 +39,7 @@ La table consolidée est `structure`.
 `changement` : ajouts et retraits de structures, ICG, IAS (fermetures), limitations, travaux prévus, type, réseau,
 hauteur libre, ainsi que la date de **dernière inspection générale** (champ suivi de `structure_detail`, comparé avant
 remplacement). Chaque consolidation est inscrite dans `source_run` (`source = 'consolidation'`, nombre d'écarts en note).
-`build.export_journal` en tire `data/journal.js` (730 derniers jours), lu par le panneau « Quoi de neuf » et le filtre
+`build.export_journal` en tire `data/journal.js` (730 derniers jours), lu par l'onglet « Quoi de neuf » et le filtre
 « Suivi » du visualiseur. Le run complet prend ~1 min (+ ~45 s pour les couches) : aucune mise à jour incrémentale
 n'est nécessaire.
 
@@ -58,6 +58,8 @@ n'est nécessaire.
 | Aléa sismique (v0.6.1) : PGA classe C 2 %/50 ans (image, tout le Québec) + classes de site du Québec (image, couche séparée) + microzonage de Montréal 2023 au-dessus (prioritaire) ; les trois images sont transparentes sur l'eau (masque GRHQ `etl/donnees/eau_qc.png`) ; valeurs par ouvrage, 5 classes × 2/5/10 % × 11 mesures ; classe de site estimée par ouvrage | `etl/sismique.py` | `data/couche-sismique.js`, `data/sismique/*.png`, `data/sismique/s-XX.js` (120 lots, ~80 Ko chacun, 9,8 Mo en tout), `data/classes-site.js` (11 401 ouvrages, dont 1 512 classés par la grille de Montréal, 0,15 Mo) ; grilles versionnées `etl/donnees/classes_site_qc.{png,json}`, `classes_site_mtl.json`, `eau_qc.png` | Grille officielle CanSHM6, CGC Dossier public 8950 (Licence du gouvernement ouvert – Canada), lue par requêtes HTTP partielles (~58 Mo sur 232) ; classes : tableau 3 de Rosset et al. 2025 (Geotechnics 5(2):24, CC BY 4.0) appliqué aux dépôts de surface du SIGEOM (MRNF, CC BY 4.0, WMS, maille ≈ 220 m) ; Montréal : Rosset et al. 2023 (Geosciences 13(9):256, CC BY 4.0) ; eau : GRHQ simple (MRNF, WMS) |
 | Cours d'eau (v0.5.6, activée par défaut) | — | tuiles WMS, rien à héberger | GRHQ simple (MRNF) |
 | Zones de dégel (v0.6.5) : zones 1, 2 et 3 et dates officielles de la dernière période de dégel ; contours simplifiés (Douglas-Peucker 150 m, îlots < 0,5 km² omis, 1e-4 degré) ; canevas propre sous les réseaux, non cliquable ; une seule couche à la fois parmi PGA, classes de site et dégel | `etl/degel.py` | `data/couche-degel.js` (~0,16 Mo) | WFS du MTMD `ms:zone_degel` (jeu « Zone de dégel » de Données Québec, CC BY 4.0) |
+| Caméras de circulation (v0.6.7, désactivée par défaut) : 680 caméras (position, n°, description, route, région, pont) ; pictogramme de caméra dans le canevas commun, au-dessus des structures ; survol : boucle vidéo MP4 des dernières images, lue en direct sur Québec 511 (`camera.ashx?id=…&format=mp4`), à défaut l'image fixe (`Images/Cameras/<Ville>/cam/<n°>.jpg`, où Québec 511 met son image « non disponible »), à défaut le même message en texte ; clic : carte de Québec 511 centrée au même endroit (`Default.aspx?lat=…&lng=…&zoom=16`) ; écran tactile : fenêtre avec vidéo et lien. Rien n'est enregistré ni copié | `etl/cameras.py` | `data/couche-cameras.js` (~73 Ko) | WFS du MTMD `ms:infos_cameras` (jeu « Caméra de circulation », CC BY 4.0) ; images © Québec 511 ([conditions](https://www.quebec511.info/fr/basdepage/Utilisation.aspx)) |
+| Habitats fauniques pour la fenêtre « Environnement » (v0.6.7, pas une couche de la carte) : 2 671 habitats légaux et informationnels (aires de confinement du cerf, héronnières, oiseaux aquatiques, rat musqué, habitat du poisson, HEMV…), contours simplifiés (Douglas-Peucker 12 m, 1e-5 degré, îlots < 0,05 ha omis), boîte englobante par habitat ; « Habitat du poisson (Sans publication) » : point publié gardé ; fiches Données Québec (titre, licence, date) des jeux de la fenêtre | `etl/environnement.py` | `data/couche-environnement.js` (~1,7 Mo, lu à la première ouverture de la fenêtre) | GeoServer du MRNF `Habitats_Fauniques_Pub` (WFS `/ows`, CC BY 4.0) : refuse les requêtes de navigateur (403 avec en-tête Origin), d'où le précalcul ; urllib (le serveur coupe `requests`) |
 
 Lignes simplifiées (Douglas-Peucker, 10 m) et encodées en entiers delta. Les débits sont appariés par n° de route
 et distance à la structure (`approx` = repli géométrique sans concordance de n°, bit 1 = portée, bit 2 = franchie), avec
@@ -106,8 +108,8 @@ vers le nom de fichier versionné ; `.nojekyll` désactive Jekyll. Le site n'a b
 des HTML, de `sw.js`, de `js/` et de `data/` (sans `raw/` ni `ponts.sqlite`, exclus par `.gitignore`).
 
 **Modules à la demande** (v0.5.6) : `js/hydro.js` (fenêtre « Cours d'eau au pont »), `js/sismique.js` (fenêtre « Aléa
-sismique ») et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR », contrat `window.QA_MOD.lidar.open(o)`) ne sont chargés
-qu'à la première ouverture. Contrat : `window.QA_MOD[clé].render(o, body, ctx)` ; la page leur
+sismique »), `js/environnement.js` (v0.6.7, fenêtre « Environnement ») et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR »,
+contrat `window.QA_MOD.lidar.open(o)`) ne sont chargés qu'à la première ouverture. Contrat : `window.QA_MOD[clé].render(o, body, ctx)` ; la page leur
 prête `window.QA` (échappement, formats, `fetchT` borné dans le temps corps compris, `loadScript`, `distM`, `det`).
 
 **Interface** (v0.6.6) : nom affiché « QuickerAtlas » ; dépôt renommé `acheruel/QuickerAtlas`, site
@@ -115,10 +117,21 @@ prête `window.QA` (échappement, formats, `fetchT` borné dans le temps corps c
 gardent le préfixe `QuickerAtlasOA-v…` (lu par `tests/js/viewer_pure.mjs`). Fenêtre d'accueil `<dialog id="welcome">` ouverte à chaque chargement : avertissement « non
 officiel » à accepter (Échap ignoré ; rouverte si le navigateur la ferme sans « J'ai compris ») ; la pastille « Non
 officiel » du bandeau la rouvre. Onglets en boutons avec icônes (`#view-tabs`) : Carte, Liste, Statistiques, Galerie
-(ancienne vue « Défilement », clé `defile` inchangée dans le hash), « Quoi de neuf » (bouton sans vue, panneau placé sous
-lui par `placeNews`), Ponts remarquables ; libellés courts sous 800 px. Bouton « Masquer » sous « Couches »
+(ancienne vue « Défilement », clé `defile` inchangée dans le hash), « Quoi de neuf » (v0.6.7 : onglet à part entière,
+vue `news`, `#v=news` ; avant : panneau flottant), Ponts remarquables ; libellés courts sous 800 px. Bouton « Masquer » sous « Couches »
 (`setPtsHidden`) : retire le groupe des structures, les numéros et les couches de points `forestiers` et `wikiponts`
 (gardées dans `pq-couches-v060` et remises au réaffichage) ; état non conservé d'une visite à l'autre.
+
+**v0.6.7** : titre « Atlas d’ouvrages d’art au Québec » ; balises Open Graph (titre, description, image `docs/apercu-lien.jpg`
+1200 × 630) pour l'aperçu des liens partagés. Statistiques en sous-onglets (`ST_TABS` : Vue d'ensemble, Régions, Âge,
+Caractéristiques, Suivi et trafic ; choix gardé dans `pq-stats-onglet`) sous un bandeau fixe (indice ICG ou IAS et sa
+légende en rectangles de couleur) ; section « Sol : classe de site » retirée (la fenêtre « Aléa sismique » charge
+elle-même `data/classes-site.js`). Fenêtre « Environnement » (`js/environnement.js`) : 7 thèmes et les occurrences
+masquées, rayons 1, 2 et 5 km (requêtes ArcGIS à 2 km, puis à 5 km si on le choisit ; simplification serveur 5 à 40 m),
+habitats fauniques lus dans `data/couche-environnement.js`, fond OSM atténué par défaut (gris clair, satellite), zoom à
+la molette continu (gestionnaire `smoothWheel` de la page), tous les polygones dans un volet unique triés du plus grand
+au plus petit, remplissage léger pour ceux qui contiennent l'ouvrage, survol d'un thème qui estompe les autres, lien vers
+chaque jeu de Données Québec et chaque service.
 
 **LiDAR** (MNEHR 1 m de Ressources naturelles Canada, Licence du gouvernement ouvert – Canada) : fonds « Relief ombré
 MNT / MNS » en tuiles WMS, et bouton « Profil LiDAR » de la fiche, calculé à la demande dans le navigateur (WCS en

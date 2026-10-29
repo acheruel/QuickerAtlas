@@ -16,15 +16,16 @@ plus rapide à explorer.
   état (ICG), restrictions (IAS), limitation de poids ou de hauteur.
 - **Lire la fiche d’un ouvrage** : photo, dimensions, état, dernière inspection, trafic, liens vers la fiche et le
   rapport d’inspection officiels du MTMD, et vers Wikipédia pour environ 160 ponts connus.
-- **Changer de point de vue** avec la barre d’onglets : carte, liste exportable (CSV), statistiques cliquables,
-  galerie (une structure à la fois, en photo), « Quoi de neuf » (changements entre les mises à jour et inspections
-  récentes), ou liste des **ponts remarquables du Canada** (Wikipédia) : étoiles dorées sur la carte, hors filtres et
-  statistiques.
+- **Changer de point de vue** avec la barre d’onglets : carte, liste exportable (CSV), statistiques cliquables
+  (rangées en cinq catégories : vue d’ensemble, régions, âge, caractéristiques, suivi et trafic), galerie (une structure
+  à la fois, en photo), « Quoi de neuf » (changements entre les mises à jour et inspections récentes), ou liste des
+  **ponts remarquables du Canada** (Wikipédia) : étoiles dorées sur la carte, hors filtres et statistiques.
 - **Ajouter des couches** : réseau routier et ferroviaire, cours d’eau, sondages géotechniques, aléa sismique et
-  classes de site, zones de dégel du MTMD, autres ponts hors MTMD (forestiers, municipaux…), ouvrages des villes de
-  Montréal et Sherbrooke. Le bouton **Masquer**, sous « Couches », cache tous les points pour lire une couche seule.
+  classes de site, zones de dégel du MTMD, **caméras de circulation de Québec 511** (vidéo en direct au survol), autres
+  ponts hors MTMD (forestiers, municipaux…), ouvrages des villes de Montréal et Sherbrooke. Le bouton **Masquer**, sous « Couches », cache tous les points pour lire une couche seule.
 - **Outils d’ingénierie** (dans la fiche) : profil LiDAR (hauteur sous l’ouvrage, pentes), cours d’eau et débits au
-  pont, aléa sismique du code national du bâtiment.
+  pont, **environnement** (aires protégées, habitats fauniques et floristiques, espèces en situation précaire, milieux
+  humides, zones inondables et espèces envahissantes à 1, 2 ou 5 km), aléa sismique du code national du bâtiment.
 
 Chaque vue garde ses filtres dans l’adresse : copiez le lien pour partager exactement ce que vous voyez.
 

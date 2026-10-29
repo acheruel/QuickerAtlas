@@ -268,7 +268,10 @@
 
     Promise.all([
       window.QA.loadScript('data/sismique/s-' + key + '.js'),
-      window.QA.loadScript('data/sismique/meta.js').catch(function(){ return null; })
+      window.QA.loadScript('data/sismique/meta.js').catch(function(){ return null; }),
+      // v0.6.7 : la page ne charge plus les classes de site (section retirée des statistiques) : la fenêtre les lit
+      // elle-même (microzonage de Montréal compris), facultatives
+      window.QA.loadScript('data/classes-site.js').catch(function(){ return null; })
     ]).then(function(){
       if (!ctx.alive()) return;
       var sh = (window.PQ_SISMIQUE || {})[key], row = sh && sh[o.num];
