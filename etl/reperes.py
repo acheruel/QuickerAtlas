@@ -24,6 +24,11 @@ Sortie `data/reperes.js` :
     window.PQ_REPERES = {"generated", "source", "attribution", "routes": ["Autoroute 20", …], "sens": ["Est", …],
       "items": {"<n° de structure>": [route, km_a, dist_a_m, km_b|null, km_estime|null, sens|null, franchie], …}}
 
+v0.6.8 (2e partie) : couche « Repères kilométriques » de la carte, `data/couche-reperes.js` :
+
+    window.PQ_COUCHES.reperes = {"generated", "source", "attribution", "noms": ["autoroute Félix-Leclerc", …],
+      "sens": ["Est", …], "points": [[lat_e5, lon_e5, km × 10, nom, sens|null, n° de route|null], …]}
+
 `km_a` = repère le plus proche (à `dist_a_m` mètres) ; `km_b` = l'autre repère qui encadre la structure ; `route` et
 `sens` = index dans `routes` et `sens` ; `franchie` = 1 si le repère est celui de la route franchie.
 Usage : python -m etl.reperes [--no-fetch]
@@ -52,6 +57,7 @@ PAGE = "https://www.donneesquebec.ca/recherche/dataset/repere-kilometrique"
 ATTRIBUTION = "Repères kilométriques : MTMD, Données Québec (CC BY 4.0)"
 RAW = RAW_DIR / "repere_km.csv"
 OUT = DATA_DIR / "reperes.js"
+OUT_COUCHE = DATA_DIR / "couche-reperes.js"
 
 RAYON_M = 2500        # repère le plus proche retenu jusqu'à cette distance
 ECART_M = 300         # distance max. de la structure à la droite qui relie deux repères voisins
@@ -216,6 +222,17 @@ def construire(reperes: list[dict], structures: list[dict]) -> dict:
     return {"routes": list(routes), "sens": list(sens_l), "items": items}
 
 
+def couche(reperes: list[dict]) -> dict:
+    """Points de la couche de la carte (repères routiers seulement), triés par route puis km."""
+    noms: dict[str, int] = {}
+    sens: dict[str, int] = {}
+    pts = []
+    for r in sorted(reperes, key=lambda r: (r["route"] or 0, r["nom"], r["km"])):
+        pts.append([round(r["lat"] * 1e5), round(r["lon"] * 1e5), round(r["km"] * 10), noms.setdefault(r["nom"], len(noms)),
+                    sens.setdefault(r["sens"], len(sens)) if r["sens"] else None, r["route"]])
+    return {"noms": list(noms), "sens": list(sens), "points": pts}
+
+
 def run(fetch: bool = True) -> dict:
     if fetch:
         r = net.get(net.session(), URL, timeout=300)
@@ -228,6 +245,9 @@ def run(fetch: bool = True) -> dict:
     payload = {"generated": date.today().isoformat(), "source": PAGE, "attribution": ATTRIBUTION, **res}
     corps = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     OUT.write_text(f"window.PQ_REPERES={corps};\n", encoding="utf-8", newline="\n")
+    c = {"generated": payload["generated"], "source": PAGE, "attribution": ATTRIBUTION, **couche(reperes)}
+    corps = json.dumps(c, ensure_ascii=False, separators=(",", ":"))
+    OUT_COUCHE.write_text(f"window.PQ_COUCHES=window.PQ_COUCHES||{{}};window.PQ_COUCHES.reperes={corps};\n", encoding="utf-8", newline="\n")
     n = len(res["items"])
     entre = sum(1 for v in res["items"].values() if v[3] is not None)
     log.info("repères : %d lus, %d structures sur %d (%d entre deux repères)", len(reperes), n, len(structures), entre)

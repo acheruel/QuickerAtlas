@@ -22,7 +22,8 @@ plus rapide à explorer.
   à la fois, en photo), « Quoi de neuf » (changements entre les mises à jour et inspections récentes), ou liste des
   **ponts remarquables du Canada** (Wikipédia) : étoiles dorées sur la carte, hors filtres et statistiques.
 - **Ajouter des couches** : réseau routier et ferroviaire, cours d’eau, sondages géotechniques, aléa sismique et
-  classes de site, zones de dégel du MTMD, **caméras de circulation de Québec 511** (vidéo en direct au survol), autres
+  classes de site, zones de dégel du MTMD, **débits de circulation** (DJMA de tout le réseau, comme la carte du MTMD), repères
+  kilométriques, **caméras de circulation de Québec 511** (vidéo en direct au survol), autres
   ponts hors MTMD (forestiers, municipaux…), ouvrages des villes de Montréal et Sherbrooke. Le bouton **Masquer**, sous « Couches », cache tous les points pour lire une couche seule.
 - **Outils d’ingénierie** (dans la fiche) : profil LiDAR (hauteur sous l’ouvrage, pentes), cours d’eau et débits au
   pont, **environnement** (aires protégées, habitats fauniques et floristiques, espèces en situation précaire, milieux

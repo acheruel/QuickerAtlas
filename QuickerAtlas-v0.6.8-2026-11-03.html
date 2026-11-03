@@ -1836,6 +1836,147 @@ table.list tbody tr:hover{background:#eef5f7}
     })))));
   }
 
+  // ---------- Débits de circulation sur tout le réseau (v0.6.8) : data/couche-trafic.js (etl/trafic.py) ----------
+  // Comme la carte des débits du MTMD : chaque section de trafic colorée selon son DJMA le plus récent (classes et
+  // teintes du MTMD, clarté ajustée pour les daltoniens), trait plus épais pour les classes plus chargées, DJMA écrit
+  // sur la plus longue partie de chaque section dès le zoom TRAFIC_Z (étiquettes qui se chevauchent omises, gros
+  // débits d'abord) ; tirets = DJMA d'une année antérieure ; gris pointillé = non disponible.
+  var TRAFIC_Z = 11, TRAFIC_DASH = '7 4', TRAFIC_ND_DASH = '2 4';
+  function trafTip(T, i){
+    var x = T.sections[i];
+    if (!x) return '';
+    var h = '<b>' + (x[3] != null ? 'DJMA ' + x[4] + ' : ' + nf.format(x[3]) + ' véh./j' : 'DJMA non disponible') + '</b>' + (x[4] != null && x[4] < T.annee ? ' <small>(pas de valeur ' + T.annee + ')</small>' : '') +
+      '<br><small>' + esc([x[1], x[2]].filter(Boolean).join(' → ')) + ' · section ' + esc(x[0]) + '</small>';
+    var ext = [x[5] != null ? 'été ' + nf.format(x[5]) : null, x[6] != null ? 'hiver ' + nf.format(x[6]) : null, x[7] != null ? nf1.format(x[7]) + ' % de camions' : null].filter(Boolean);
+    return h + (ext.length ? '<br><small>' + ext.join(' · ') + '</small>' : '');
+  }
+  // point à mi-longueur d'une ligne (coordonnées monde au zoom 0)
+  function midLine(w){
+    var tot = 0, j, d = [];
+    for (j = 0; j + 3 < w.length; j += 2) { var l = Math.hypot(w[j + 2] - w[j], w[j + 3] - w[j + 1]); d.push(l); tot += l; }
+    var half = tot / 2;
+    for (j = 0; j < d.length; j++) {
+      if (half <= d[j] || j === d.length - 1) { var t = d[j] ? Math.min(1, half / d[j]) : 0; return [w[2 * j] + t * (w[2 * j + 2] - w[2 * j]), w[2 * j + 1] + t * (w[2 * j + 3] - w[2 * j + 1])]; }
+      half -= d[j];
+    }
+    return [w[0], w[1]];
+  }
+  // Étiquettes (cases de 6 px déjà prises) dessinées après les traits, dans le même canevas
+  var TraficLines = FastLines ? FastLines.extend({
+    _updatePath: function(){
+      // traits plus fins aux petits zooms (vue de la province : le liseré alourdirait la carte)
+      var zf = this._map ? (this._map.getZoom() < 8 ? 0.5 : this._map.getZoom() < 10 ? 0.75 : 1) : 1;
+      this._lots.forEach(function(B){ if (B.w0 == null) B.w0 = B.weight; B.weight = B.w0 * zf; });
+      FastLines.prototype._updatePath.call(this);
+      var r = this._renderer, m = this._map;
+      if (!r._drawing || !m || m.getZoom() < TRAFIC_Z) return;
+      var ctx = r._ctx, k = this._k, ox = this._o.x, oy = this._o.y, rb = r._bounds, taken = {}, G = 6;
+      ctx.font = '600 10px Inter, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 1.5;
+      for (var i = 0; i < this._lbls.length; i++) {
+        var e = this._lbls[i], x = e.m[0] * k - ox, y = e.m[1] * k - oy;
+        if (x < rb.min.x || x > rb.max.x || y < rb.min.y || y > rb.max.y) continue;
+        var w = ctx.measureText(e.txt).width + 8, h = 14, x0 = Math.floor((x - w / 2) / G), x1 = Math.floor((x + w / 2) / G), y0 = Math.floor((y - h / 2) / G), y1 = Math.floor((y + h / 2) / G), free = true, gx, gy;
+        for (gx = x0; gx <= x1 && free; gx++) for (gy = y0; gy <= y1; gy++) if (taken[gx + ',' + gy]) { free = false; break; }
+        if (!free) continue;
+        for (gx = x0; gx <= x1; gx++) for (gy = y0; gy <= y1; gy++) taken[gx + ',' + gy] = 1;
+        ctx.globalAlpha = 0.95; ctx.fillStyle = '#ffffff'; ctx.strokeStyle = e.c;
+        ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x - w / 2, y - h / 2, w, h, 4); else ctx.rect(x - w / 2, y - h / 2, w, h);
+        ctx.fill(); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.fillStyle = '#102d41'; ctx.fillText(e.txt, x, y + 0.5);
+      }
+    }
+  }) : null;
+  function buildTrafic(){
+    var T = couche('trafic'), g = L.layerGroup();
+    if (!T) return g;
+    var ND = T.classes.length - 1, lots = {}, lbls = [];
+    T.lines.forEach(function(a){
+      var e = encLine(a, 3), c = a[0], old = a[2] & 1, key = c + '-' + old, x = T.sections[a[1]];
+      e.tip = trafTip(T, a[1]);
+      (lots[key] = lots[key] || { c: c, old: old, lines: [] }).lines.push(e);
+      if ((a[2] & 2) && x && x[3] != null) lbls.push({ m: midLine(e.w), txt: nf.format(x[3]), c: T.classes[c].color, n: x[3] });
+    });
+    lbls.sort(function(p, q){ return q.n - p.n; });            // gros débits étiquetés d'abord
+    var list = Object.keys(lots).map(function(k){ return lots[k]; }).sort(function(p, q){ return (p.c !== ND) - (q.c !== ND) || p.c - q.c; });
+    // liseré foncé sous chaque classe connue (comme le trait noir de la carte du MTMD : lisible sur les routes jaunes et
+    // orange du fond), puis un lot par classe et par fraîcheur de la valeur (« non disponible » dessous, gros débits dessus)
+    var cas = list.filter(function(B){ return B.c !== ND; }).map(function(B){ return { lines: B.lines, color: '#102d41', weight: T.classes[B.c].weight + 2.2, opacity: 0.85, cap: 'butt' }; });
+    var fl = new TraficLines(cas.concat(list.map(function(B){
+      var cl = T.classes[B.c];
+      return { lines: B.lines, tip: true, color: cl.color, weight: cl.weight, opacity: 1, cap: 'butt', dash: B.c === ND ? TRAFIC_ND_DASH : (B.old ? TRAFIC_DASH : null) };
+    })));
+    fl._lbls = lbls;
+    g.addLayer(lineTips(fl));
+    return g;
+  }
+
+  // ---------- Repères kilométriques (v0.6.8) : data/couche-reperes.js (etl/reperes.py), ≈ 13 600 panneaux ----------
+  // Panneau vert (comme sur la route) avec la valeur du km en blanc dès le zoom RK_Z ; avant, simple carré vert de
+  // 4 px. Forme carrée, jamais ronde (structures) : lisible sans la couleur. Panneaux qui se chevauchent : carré seul.
+  var RK_Z = 12, RK_COL = '#0b6b3a';
+  var RepereLayer = window.L ? L.Path.extend({
+    initialize: function(R){
+      this._R = R; this._hit = null;
+      this._pts = R.points.map(function(p){ var w = worldXY(p[0] / 1e5, p[1] / 1e5); return { x: w[0], y: w[1], p: p }; });
+      L.setOptions(this, { renderer: canvas, interactive: true });
+    },
+    _project: function(){ var m = this._map; this._k = m.getZoomScale(m.getZoom(), 0); this._o = m.getPixelOrigin(); this._pxBounds = new L.Bounds([-1e9, -1e9], [1e9, 1e9]); },
+    _update: function(){},
+    _empty: function(){ return false; },
+    _updatePath: function(){
+      var r = this._renderer;
+      if (!r._drawing) return;
+      var ctx = r._ctx, k = this._k, ox = this._o.x, oy = this._o.y, rb = r._bounds, z = this._map.getZoom(), taken = {}, G = 6;
+      var x0 = rb.min.x - 20, y0 = rb.min.y - 20, x1 = rb.max.x + 20, y1 = rb.max.y + 20;
+      ctx.globalAlpha = 1; ctx.font = '700 9.5px Inter, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (var i = 0; i < this._pts.length; i++) {
+        var q = this._pts[i], x = q.x * k - ox, y = q.y * k - oy;
+        if (x < x0 || x > x1 || y < y0 || y > y1) continue;
+        var t = z >= RK_Z ? nfKm.format(q.p[2] / 10) : null, w = t ? ctx.measureText(t).width + 7 : 0, h = 13, free = !!t;
+        if (t) {
+          var gx0 = Math.floor((x - w / 2) / G), gx1 = Math.floor((x + w / 2) / G), gy0 = Math.floor((y - h / 2) / G), gy1 = Math.floor((y + h / 2) / G), gx, gy;
+          for (gx = gx0; gx <= gx1 && free; gx++) for (gy = gy0; gy <= gy1; gy++) if (taken[gx + ',' + gy]) { free = false; break; }
+          if (free) for (gx = gx0; gx <= gx1; gx++) for (gy = gy0; gy <= gy1; gy++) taken[gx + ',' + gy] = 1;
+        }
+        if (free) {
+          ctx.fillStyle = RK_COL; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2;
+          ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x - w / 2, y - h / 2, w, h, 2); else ctx.rect(x - w / 2, y - h / 2, w, h);
+          ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#ffffff'; ctx.fillText(t, x, y + 0.5);
+        } else {
+          var s = z >= 9 ? 5 : 4;
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(x - s / 2 - 1, y - s / 2 - 1, s + 2, s + 2);
+          ctx.fillStyle = RK_COL; ctx.fillRect(x - s / 2, y - s / 2, s, s);
+        }
+      }
+    },
+    _containsPoint: function(pt){
+      var k = this._k, best = null, bd = 64;                 // 8 px
+      for (var i = 0; i < this._pts.length; i++) {
+        var q = this._pts[i], dx = q.x * k - this._o.x - pt.x, dy = q.y * k - this._o.y - pt.y;
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) continue;
+        var d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = q.p; }
+      }
+      this._hit = best;
+      return !!best;
+    }
+  }) : null;
+  function rkTip(R, p){
+    var nom = R.noms[p[3]] || '', sens = p[4] != null ? R.sens[p[4]] : null;
+    return '<b>Repère km ' + nfKm.format(p[2] / 10) + '</b> · ' + esc(nom.charAt(0).toUpperCase() + nom.slice(1)) +
+      (p[5] && p[5] < 1000 && !/\d/.test(nom) ? ' (route ' + p[5] + ')' : '') + (sens ? '<br><small>Panneau en direction ' + esc(sens.toLowerCase()) + '</small>' : '');
+  }
+  function buildReperes(){
+    var R = couche('reperes'), g = L.layerGroup();
+    if (!R) return g;
+    var lyr = new RepereLayer(R);
+    lyr.bindTooltip(function(){ return lyr._hit ? rkTip(R, lyr._hit) : ''; }, { sticky: true, className: 'line-tip' });
+    lyr.on('mousemove', function(){ if (lyr._hit === lyr._tipFor) return; lyr._tipFor = lyr._hit; if (lyr.isTooltipOpen()) lyr.getTooltip().update(); });
+    g.addLayer(lyr);
+    return g;
+  }
+
   // ---------- Autres ponts hors MTMD (v0.5.6 « ponts forestiers », renommés en v0.6.2) : AQréseau+ du MRNF ----------
   // Forme = source (triangle : Routard, chemins multiusages ; carré : Forêt ouverte ; cercle : autres sources),
   // remplissage = statut (plein : ouvert, creux : inconnu, plein foncé barré : fermé). Aucun type ni état : inconnus.
@@ -3588,6 +3729,12 @@ table.list tbody tr:hover{background:#eef5f7}
     return symSvg(M.shape ? M.shape(k) : 'circle', M.color(k), 14);
   }
   // Trait de légende : couleur, épaisseur et tirets réels de la couche (le tiret distingue les classes sans la couleur)
+  // v0.6.8 : pastille de la couche des débits (liseré foncé, trait de la classe, tirets au besoin)
+  function trafSwatch(cl, dash, lisere){
+    return '<svg class="sym ln" width="26" height="10" viewBox="0 0 26 10" aria-hidden="true">' +
+      (lisere ? '<line x1="1" y1="5" x2="25" y2="5" stroke="#102d41" stroke-width="' + Math.min(9, cl.weight + 2.2) + '"/>' : '') +
+      '<line x1="1" y1="5" x2="25" y2="5" stroke="' + cl.color + '" stroke-width="' + cl.weight + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/></svg>';
+  }
   function lineSwatch(cl, rail){
     var w = rail ? Math.min(1.6, cl.weight || 1.5) : Math.max(1.2, cl.weight || 2);
     return '<svg class="sym ln" width="26" height="10" viewBox="0 0 26 10" aria-hidden="true">' +
@@ -3641,6 +3788,21 @@ table.list tbody tr:hover{background:#eef5f7}
         return;
       }
       if (ov.key === 'degel') { h += lgDet(ov, degelLegend(C)); return; }
+      // v0.6.8 : débits (classes du MTMD) et repères kilométriques
+      if (ov.key === 'trafic') {
+        var ndT = C.classes.length - 1;
+        h += lgDet(ov, '<div class="lg-chips">' + C.classes.map(function(cl, i){
+          return '<span>' + trafSwatch(cl, i === ndT ? TRAFIC_ND_DASH : null, i !== ndT) + esc(cl.label) + (i === ndT ? '' : ' véh./j') + '</span>';
+        }).join('') + '<span>' + trafSwatch({ color: '#fde047', weight: 3.5 }, TRAFIC_DASH, true) + 'DJMA d’une année avant ' + C.annee + '</span></div>' +
+          '<div class="lg-src">DJMA le plus récent (' + C.annee + ' en général), écrit sur la carte dès le zoom ' + TRAFIC_Z + ' ; classes de la carte des débits du MTMD. ' +
+          '<a href="' + esc(C.source) + '" target="_blank" rel="noopener">MTMD, Données Québec</a> (CC BY 4.0)</div>');
+        return;
+      }
+      if (ov.key === 'reperes') {
+        h += '<div class="lg-sub">Repères kilométriques</div><div class="lg-chips"><span><svg class="sym" width="22" height="13" viewBox="0 0 22 13" aria-hidden="true"><rect x="0.6" y="0.6" width="20.8" height="11.8" rx="2" fill="' + RK_COL + '" stroke="#fff" stroke-width="1.2"/><text x="11" y="9.6" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fff">km</text></svg>' +
+          nf.format(C.points.length) + ' panneaux, valeur affichée dès le zoom ' + RK_Z + '</span></div><div class="lg-src"><a href="' + esc(C.source) + '" target="_blank" rel="noopener">MTMD, Données Québec</a> (CC BY 4.0)</div>';
+        return;
+      }
       if (ov.key === 'wikiponts') {
         h += '<div class="lg-sub">Ponts remarquables</div><div class="lg-chips"><span>' + starSvg(14) + nf.format(C.ponts.length) + ' ouvrages hors MTMD (Wikipédia) · <button type="button" class="lg-rq" data-rq>voir la liste</button></span></div>';
         return;
@@ -3676,6 +3838,9 @@ table.list tbody tr:hover{background:#eef5f7}
     } },
     { key: 'rtss', name: 'Réseau routier (RTSS)', sub: 'MTMD, par classe de route', src: 'data/couche-rtss.js', z: 0, build: function(){ return buildLines('rtss'); } },
     { key: 'rssce', couche: 'rtss', name: 'RSSCE estimé', sub: 'réseau du commerce extérieur, non officiel', src: 'data/couche-rtss.js', z: -1, build: function(){ return buildLines('rtss', function(a){ return a[2] & 1; }); } },
+    // v0.6.8 : débits de circulation sur tout le réseau (comme la carte du MTMD) et repères kilométriques (désactivés par défaut)
+    { key: 'trafic', name: 'Débits de circulation (DJMA)', sub: 'MTMD, tout le réseau ; valeurs dès le zoom 11', src: 'data/couche-trafic.js', z: 0.5, build: buildTrafic },
+    { key: 'reperes', name: 'Repères kilométriques', sub: 'MTMD, ≈ 13 600 panneaux ; valeurs dès le zoom 12', src: 'data/couche-reperes.js', z: 0.3, build: buildReperes },
     { key: 'rail', name: 'Réseau ferroviaire et ses ponts', sub: 'MTMD ; ponts CN, CPKC et autres', src: 'data/couche-rail.js', z: 1, build: function(){ var g = buildLines('rail'); buildRailBridges(g); return g; } },
     // v0.6.3 : ponts remarquables du Canada (Wikipédia, Wikidata), étoiles hors filtres et statistiques
     { key: 'wikiponts', name: 'Ponts remarquables (Wikipédia)', sub: 'Canada, hors inventaire du MTMD', filtre: true, src: 'data/couche-wikiponts.js', z: 3, build: buildWiki },

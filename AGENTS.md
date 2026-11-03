@@ -41,7 +41,7 @@ python -m etl update              # toutes les sources + consolidation + export 
 python -m etl update --only wfs   # une source (wfs, apex_list, hauteurs, gps, odata…)
 python -m etl update --no-fetch   # reconsolider depuis data/raw/
 python -m etl export              # data/structures.js, details.js, journal.js
-python -m etl couches [--no-fetch]  # couches seules (réseaux, géotech, débits, repères km, villes, forestiers, sismique, dégel, wikiponts, habitats, caméras)
+python -m etl couches [--no-fetch]  # couches seules (réseaux, géotech, débits, débits du réseau, repères km, villes, forestiers, sismique, dégel, wikiponts, habitats, caméras)
 python -m etl report              # rapport de jointure
 python -m pytest                  # tous les tests (Python + Node si présent)
 python -m http.server 8765 --bind 127.0.0.1   # serveur local (config « ponts-web » de .claude/launch.json)
@@ -93,7 +93,8 @@ de centres de données (403) : ni GitHub Actions ni une session infonuagique ne 
 - Le navigateur garde `data/*.js` en cache : `await fetch('data/x.js',{cache:'reload'})` puis recharger avec `?r=N`.
 - Fonds Plan Québec et OSM exigent un Referer : absents en `file://`.
 - Québec 511 (caméras) est derrière Cloudflare : Chrome sans interface et les requêtes de script reçoivent un 403 ;
-  la vidéo des caméras ne se vérifie que dans un vrai navigateur. Habitats fauniques du MRNF : 403 dès qu'un en-tête
+  la vidéo des caméras ne se vérifie que dans un vrai navigateur. Vidéo refusée sur le laptop du travail (2026-11-03) : filtre
+  web de l'entreprise, pas Québec 511. Habitats fauniques du MRNF : 403 dès qu'un en-tête
   Origin est présent → précalcul ETL (`etl/environnement.py`), pas de requête depuis la page.
 - Serveurs fragiles : AQréseau+/MRNF coupent `requests` (curl ou urllib) ; Overpass limité (4 requêtes/IP, souvent
   lent : l'atlas abandonne à 7 s) ; Openverse ~20 s/requête ; MELCCFP parfois hors service.

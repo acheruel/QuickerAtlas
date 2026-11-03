@@ -57,3 +57,12 @@ def test_construire_format_compact():
     route, km_a, d_a, km_b, est, sens, franchie = res["items"]["14822N"]
     assert res["routes"][route] == "Autoroute 40" and res["sens"][sens] == "Ouest"
     assert (km_a, km_b, franchie) == (272.0, 273.0, 0) and isinstance(d_a, int) and est == 272.3
+
+
+def test_couche_de_la_carte():
+    """v0.6.8 : points de la couche « Repères kilométriques » (km × 10, nom, sens, n° de route)."""
+    c = reperes.couche(reperes.parse(FIX.read_bytes()))
+    assert len(c["points"]) == 13
+    p = next(x for x in c["points"] if x[5] == 40 and x[2] == 2720 and c["sens"][x[4]] == "Ouest")
+    assert (p[0], p[1]) == (4668596, -7175591) and c["noms"][p[3]] == "autoroute Félix-Leclerc"
+    assert any(x[4] is None for x in c["points"])                        # route 172 : pas de sens
