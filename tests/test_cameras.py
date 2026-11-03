@@ -32,3 +32,12 @@ def test_image_url_selon_la_ville():
     assert cameras.image_url("Q5413") == "https://www.quebec511.info/Images/Cameras/Quebec/cam/5413.jpg"
     assert cameras.image_url("M1330004") == "https://www.quebec511.info/Images/Cameras/Montreal/cam/1330004.jpg"
     assert cameras.image_url("X12") is None and cameras.image_url(None) is None
+
+
+def test_adresse_officielle_de_la_camera_inchangee():
+    """v0.6.8 : l'adresse donnée par les données ouvertes suit toujours le gabarit `fenetre`."""
+    gj = json.loads(FIX.read_text(encoding="utf-8"))
+    assert cameras.adresses_changees(gj) == []
+    assert cameras.GABARITS["fenetre"].format(id=3998) == "https://www.quebec511.info/Carte/Fenetres/FenetreVideo.html?id=3998"
+    gj["features"][0]["properties"]["URL_FLUX_DONNEE"] = "https://www.511.gouv.qc.ca/cameras/3998"
+    assert cameras.adresses_changees(gj) == ["https://www.511.gouv.qc.ca/cameras/3998"]

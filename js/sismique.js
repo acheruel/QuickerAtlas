@@ -1,4 +1,4 @@
-/* Fenêtre « Aléa sismique » de QuickerAtlasOA : spectres Sa(T), PGA et PGV par classe de site (A à E) pour les
+/* Fenêtre « Aléa sismique » de QuickerAtlas : spectres Sa(T), PGA et PGV par classe de site (A à E) pour les
    probabilités de dépassement de 2, 5 et 10 % en 50 ans.
 
    Données : data/sismique/s-<clé>.js, précalculées par `python -m etl.sismique` à partir de la grille officielle

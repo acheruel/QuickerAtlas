@@ -10,7 +10,10 @@ seulement (aucun enregistrement). Adresses (vérifiées le 2026-10-29) :
   - image fixe : `…/Images/Cameras/<Ville>/cam/<n°>.jpg` (n° sans sa lettre ; Q = Quebec, M = Montreal,
     T = TroisRivieres, G = Gatineau) ; caméra hors service : Québec 511 y met son image « Cette image n'est pas
     disponible en ce moment » ;
-  - carte de Québec 511 centrée sur un point : `…/fr/Carte/Default.aspx?lat=<lat>&lng=<lon>&zoom=16`.
+  - carte de Québec 511 centrée sur un point : `…/fr/Carte/Default.aspx?lat=<lat>&lng=<lon>&zoom=16` ;
+  - v0.6.8 : page officielle de la caméra, donnée par le jeu de données lui-même (champ `URL_FLUX_DONNEE`) :
+    `…/Carte/Fenetres/FenetreVideo.html?id=<IDEcamera>` (lien de repli quand la vidéo est refusée). Si Québec 511
+    change cette adresse, `run` le signale dans le journal (indice que la vidéo a pu changer d'adresse aussi).
 Les balises <video> et <img> n'ont besoin ni de CORS ni d'en-tête Referer.
 
 Sortie : `data/couche-cameras.js` :
@@ -41,7 +44,8 @@ CONDITIONS = "https://www.quebec511.info/fr/basdepage/Utilisation.aspx"
 Q511 = "https://www.quebec511.info"
 GABARITS = {"video": Q511 + "/Carte/Fenetres/camera.ashx?id={id}&format=mp4",
             "image": Q511 + "/Images/Cameras/{ville}/cam/{n}.jpg",
-            "carte": Q511 + "/fr/Carte/Default.aspx?lat={lat}&lng={lon}&zoom=16"}
+            "carte": Q511 + "/fr/Carte/Default.aspx?lat={lat}&lng={lon}&zoom=16",
+            "fenetre": Q511 + "/Carte/Fenetres/FenetreVideo.html?id={id}"}
 VILLES = {"Q": "Quebec", "M": "Montreal", "T": "TroisRivieres", "G": "Gatineau"}
 RAW = RAW_DIR / "infos_cameras.geojson"
 OUT = DATA_DIR / "couche-cameras.js"
@@ -75,6 +79,17 @@ def parse(geojson: dict) -> dict:
     return {"regions": list(regions), "cameras": cams}
 
 
+def adresses_changees(geojson: dict) -> list[str]:
+    """Adresses `URL_FLUX_DONNEE` qui ne suivent plus le gabarit `fenetre` (v0.6.8) : 3 exemples au plus."""
+    autres = []
+    for f in geojson.get("features", []):
+        p = f.get("properties") or {}
+        url, ide = str(p.get("URL_FLUX_DONNEE") or "").strip(), str(p.get("IDEcamera") or "").strip()
+        if url and ide and url != GABARITS["fenetre"].format(id=ide):
+            autres.append(url)
+    return autres[:3]
+
+
 def image_url(numero: str | None) -> str | None:
     """Image fixe d'une caméra d'après son n° (« Q5413 » → …/Quebec/cam/5413.jpg) ; None si la ville est inconnue."""
     m = re.match(r"^([A-Z])(\d+)$", numero or "")
@@ -88,7 +103,11 @@ def run(fetch: bool = True) -> dict:
         r = net.get(net.session(), URL, timeout=120)
         RAW.parent.mkdir(parents=True, exist_ok=True)
         RAW.write_bytes(r.content)
-    res = parse(json.loads(RAW.read_bytes().decode("utf-8")))
+    gj = json.loads(RAW.read_bytes().decode("utf-8"))
+    res = parse(gj)
+    autres = adresses_changees(gj)
+    if autres:
+        log.warning("caméras : Québec 511 a changé l'adresse de ses caméras (ex. %s) : vérifier les gabarits", autres[0])
     if len(res["cameras"]) < 300:
         raise RuntimeError(f"caméras : {len(res['cameras'])} lues (≈ 680 attendues)")
     payload = {"generated": date.today().isoformat(), "source": PAGE, "attribution": ATTRIBUTION, "conditions": CONDITIONS,

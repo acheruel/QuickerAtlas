@@ -7,7 +7,7 @@ la redécouvrir à chaque fois.
 
 ## Cycle d'une version
 
-1. **Demande** : page Notion « QuickerAtlasOA version X.Y.Z » sous la page parente « Visualisation Ponts et ouvrages
+1. **Demande** : page Notion « QuickerAtlas version vX.Y.Z » (anciennement « QuickerAtlasOA version X.Y.Z ») sous la page parente « Visualisation Ponts et ouvrages
    d'art QC MTMD » (`3f6e798a151f80a78601f618432b05c7`). Lire aussi les captures d'écran (le n° cité peut être faux).
 2. **Faire** les demandes, puis la procédure « Publier une version » d'AGENTS.md.
 3. **Rapport** « comme d'hab » : page Notion enfant de la page parente + copie `docs/rapports/AAAA-MM-JJ-vX.Y.Z-rapport-de-version.md`.
@@ -31,6 +31,6 @@ la redécouvrir à chaque fois.
 ## Façon de travailler
 
 - Parties indépendantes (recherche de sources, audit, prototype) : déléguer à des sous-agents Sonnet est accepté.
-- Nouvelle source de données : prototype ou rapport d'abord (`prototypes/`, `docs/rapports/`), intégration seulement
-  si l'utilisateur la valide.
+- Nouvelle source de données : prototype ou rapport d'abord (`docs/rapports/`), intégration seulement si l'utilisateur
+  la valide (ou s'il la demande explicitement dans la page Notion).
 - Propositions d'idées : les noter dans le rapport, ne rien intégrer sans accord.

@@ -1,4 +1,4 @@
-// QuickerAtlasOA — cache des photos des structures (v0.5.6)
+// QuickerAtlas — cache des photos des structures (v0.5.6)
 // Le serveur du MTMD n'envoie aucun en-tête de cache (ni Cache-Control, ni ETag, ni Last-Modified) : sans ce
 // Service Worker, chaque survol ou ouverture de fiche retélécharge la photo (~45 ko). Ici : cache d'abord, réseau
 // ensuite, 600 photos au plus (les plus anciennes sortent en premier). Actif seulement en http(s), pas en file://.

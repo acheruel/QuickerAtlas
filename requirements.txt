@@ -4,3 +4,4 @@ lxml>=5.0
 pytest>=8.0
 numpy>=2.0
 pillow>=10.0
+scipy>=1.13          # couche sismique (masque du territoire)

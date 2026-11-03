@@ -1,4 +1,4 @@
-/* « Profil LiDAR » : fenêtre de QuickerAtlasOA (MNEHR 1 m de RNCan, calculé à la demande dans le navigateur).
+/* « Profil LiDAR » : fenêtre de QuickerAtlas (MNEHR 1 m de RNCan, calculé à la demande dans le navigateur).
    Module chargé à la demande (sorti du fichier principal en v0.6.0). Contrat : window.QA_MOD.lidar.open(o).
    Outils partagés reçus par window.QA (esc, nf1, nf2, ESRI, LD_WCS, fetchT, det, byNum, wireDialog). ES5.
    v0.6.0 : MNS filtré (arbres, véhicules retirés ; le profil suit le MNT hors de l'ouvrage), imagerie satellite Esri

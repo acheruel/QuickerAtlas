@@ -1165,7 +1165,7 @@ def comparer_figure10(g: dict, pdf: Path, decalages=range(-3, 4)) -> dict:
 
 # --- Validation contre l'API de RNCan ------------------------------------------------------------
 def points_validation(dossier: Path) -> list[dict]:
-    """Points de référence des réponses de l'API gardées dans `dossier` (prototypes/sismique/cache) :
+    """Points de référence des réponses de l'API gardées dans `dossier` (ex-prototypes/sismique/cache, retiré du dépôt en v0.6.8 : voir l'historique git) :
     [{num, lat, lon, classes: {A: [lignes de l'API…]}}] pour les 11 exemples et les 35 ouvrages de Montréal."""
     pts = []
     ex = json.loads((dossier / "exemples.json").read_text(encoding="utf-8"))
@@ -1280,7 +1280,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--no-fetch", action="store_true", help="relit data/raw/sismique/ au lieu de télécharger")
     ap.add_argument("--eau", action="store_true", help="avec --no-fetch : télécharge quand même le masque des eaux (GRHQ)")
-    ap.add_argument("--valider", metavar="DOSSIER", nargs="?", const="prototypes/sismique/cache",
+    ap.add_argument("--valider", metavar="DOSSIER", nargs="?", const="data/raw/sismique-api",
                     help="compare à l'API de RNCan (réponses gardées dans DOSSIER) au lieu d'écrire les fichiers")
     ap.add_argument("--fixture", metavar="FICHIER",
                     help="écrit la fixture de validation autonome des tests (avec --valider)")

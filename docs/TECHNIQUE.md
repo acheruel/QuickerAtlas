@@ -2,7 +2,8 @@
 
 Copie modernisée et enrichie de l'[inventaire des structures](https://www.transports.gouv.qc.ca/fr/projets-infrastructures/structures/Pages/inventaires-structures.aspx)
 du ministère des Transports et de la Mobilité durable du Québec : base SQLite consolidée et visualiseur cartographique.
-Plan complet : [PLAN_DE_MATCH.md](../PLAN_DE_MATCH.md).
+Historique des versions et des décisions : [docs/rapports/](rapports/) (le plan de match initial, les prototypes et les
+anciennes versions du visualiseur ont été retirés du dépôt en v0.6.8 : ils restent dans l'historique git).
 
 ## Mise à jour des données
 
@@ -13,10 +14,25 @@ python -m etl update --only wfs # une source
 python -m etl update --no-fetch # reconsolider sans télécharger
 python -m etl report            # rapport de jointure
 python -m etl export            # régénère data/structures.js et data/details.js
-python -m etl couches [--no-fetch]  # régénère seulement les couches (RTSS, rail, géotechnique, débits, villes)
+python -m etl couches [--no-fetch]  # régénère seulement les couches (RTSS, rail, géotechnique, débits, repères km, villes…)
 python -m etl fiches --limit 50  # (optionnel) crawl des fiches HTML, ~1 req/s — inutile en temps normal
 python -m pytest -q tests
 ```
+
+### Extraction automatique (v0.6.8) : toutes les 2 semaines, sur le PC de l'auteur
+
+`outils\planifier-extraction.cmd` (double-clic) enregistre la tâche Windows « QuickerAtlas - extraction » : toutes les
+2 semaines, le même jour de la semaine que le jour de l'installation (première fois le 2026-11-03), à 12 h 15 (rattrapée au
+rallumage si le PC était éteint), et la lance une première fois tout de suite. La tâche exécute `outils\extraction.ps1` :
+`git pull` (branche `main`, sans modification locale) → `python -m etl update` → `python -m pytest` → commit des seuls
+fichiers `data/` → `git push` (Pages à jour ~1 min plus tard). Tests en échec : rien n'est publié. Journal :
+`data\raw\extraction-AAAA-MM-JJ.log`. Changer l'heure : relancer le script avec `-Heure 18:30` ; arrêter :
+`Unregister-ScheduledTask "QuickerAtlas - extraction"`.
+
+Pourquoi pas GitHub Actions ou une session infonuagique : les serveurs du MTMD (outil APEX, OData,
+transports.gouv.qc.ca) et Québec 511 répondent 403 aux adresses de centres de données (vérifié le 2026-11-03 ; seul
+le WFS `ws.mapserver.transports.gouv.qc.ca` répond). Il faut une connexion résidentielle. `requirements.txt` inclut
+`scipy` (masque du territoire de la couche sismique).
 
 ## Sources
 
@@ -51,6 +67,7 @@ n'est nécessaire.
 | Réseau ferroviaire (par usage / état) | `etl/reseaux.py` | `data/couche-rail.js` (~0,3 Mo) | `ms:reseau_chfer_qc` |
 | Sondages géotechniques (+ BDG) | `etl/geotech.py` | `data/couche-geotech.js` (~1,1 Mo) | `ms:site_inv_geotech_p`, `ms:site_inv_geotech_bdg_p` |
 | Débits de circulation sur / sous chaque structure, 2016–2025 | `etl/debits.py` | `data/debits.js` (~1,5 Mo) | `ms:circulation_routier` |
+| Repère kilométrique de chaque structure (v0.6.8, pas une couche de la carte : ligne « Repère km » de la fiche) : repère le plus proche (< 2,5 km) sur la même route — voie portée par n° (« Autoroute 20 Est » : sens Est d'abord) ou par nom (routes locales), sinon route franchie — ou les deux repères qui l'encadrent, avec le km estimé par interpolation ; bretelles exclues ; ≈ 3 460 structures sur 11 700 (les repères couvrent surtout les autoroutes) | `etl/reperes.py` | `data/reperes.js` (~130 Ko) | `ms:repere_km` (jeu « Repère kilométrique ») |
 | Structures routières de la Ville de Montréal (édition 2021, avec ICG de la Ville) | `etl/villes.py` | `data/couche-mtl.js` (~0,3 Mo) + table `ouvrage_ville` | Données ouvertes de la Ville de Montréal, « Inventaire des actifs de voirie – Structures routières » (CC-BY 4.0) |
 | Ouvrages routiers de la Ville de Sherbrooke | `etl/villes.py` | `data/couche-sherbrooke.js` (~3 Ko) + table `ouvrage_ville` | Données ouvertes de la Ville de Sherbrooke, « Ouvrages routiers » (CC-BY 4.0) |
 | Ponts ferroviaires (v0.5.6) : 1 314 ponts (CN 628, CPKC 268, autres 418), longueur de la géométrie, nom OSM s'il existe | `etl/reseaux.py` | champ `ponts` de `data/couche-rail.js` (+58 Ko) | `ms:reseau_chfer_qc` (`typstruc`) ; noms : OpenStreetMap (ODbL) |
@@ -58,7 +75,7 @@ n'est nécessaire.
 | Aléa sismique (v0.6.1) : PGA classe C 2 %/50 ans (image, tout le Québec) + classes de site du Québec (image, couche séparée) + microzonage de Montréal 2023 au-dessus (prioritaire) ; les trois images sont transparentes sur l'eau (masque GRHQ `etl/donnees/eau_qc.png`) ; valeurs par ouvrage, 5 classes × 2/5/10 % × 11 mesures ; classe de site estimée par ouvrage | `etl/sismique.py` | `data/couche-sismique.js`, `data/sismique/*.png`, `data/sismique/s-XX.js` (120 lots, ~80 Ko chacun, 9,8 Mo en tout), `data/classes-site.js` (11 401 ouvrages, dont 1 512 classés par la grille de Montréal, 0,15 Mo) ; grilles versionnées `etl/donnees/classes_site_qc.{png,json}`, `classes_site_mtl.json`, `eau_qc.png` | Grille officielle CanSHM6, CGC Dossier public 8950 (Licence du gouvernement ouvert – Canada), lue par requêtes HTTP partielles (~58 Mo sur 232) ; classes : tableau 3 de Rosset et al. 2025 (Geotechnics 5(2):24, CC BY 4.0) appliqué aux dépôts de surface du SIGEOM (MRNF, CC BY 4.0, WMS, maille ≈ 220 m) ; Montréal : Rosset et al. 2023 (Geosciences 13(9):256, CC BY 4.0) ; eau : GRHQ simple (MRNF, WMS) |
 | Cours d'eau (v0.5.6, activée par défaut) | — | tuiles WMS, rien à héberger | GRHQ simple (MRNF) |
 | Zones de dégel (v0.6.5) : zones 1, 2 et 3 et dates officielles de la dernière période de dégel ; contours simplifiés (Douglas-Peucker 150 m, îlots < 0,5 km² omis, 1e-4 degré) ; canevas propre sous les réseaux, non cliquable ; une seule couche à la fois parmi PGA, classes de site et dégel | `etl/degel.py` | `data/couche-degel.js` (~0,16 Mo) | WFS du MTMD `ms:zone_degel` (jeu « Zone de dégel » de Données Québec, CC BY 4.0) |
-| Caméras de circulation (v0.6.7, désactivée par défaut) : 680 caméras (position, n°, description, route, région, pont) ; pictogramme de caméra dans le canevas commun, au-dessus des structures ; survol : boucle vidéo MP4 des dernières images, lue en direct sur Québec 511 (`camera.ashx?id=…&format=mp4`), à défaut l'image fixe (`Images/Cameras/<Ville>/cam/<n°>.jpg`, où Québec 511 met son image « non disponible »), à défaut le même message en texte ; clic : carte de Québec 511 centrée au même endroit (`Default.aspx?lat=…&lng=…&zoom=16`) ; écran tactile : fenêtre avec vidéo et lien. Rien n'est enregistré ni copié | `etl/cameras.py` | `data/couche-cameras.js` (~73 Ko) | WFS du MTMD `ms:infos_cameras` (jeu « Caméra de circulation », CC BY 4.0) ; images © Québec 511 ([conditions](https://www.quebec511.info/fr/basdepage/Utilisation.aspx)) |
+| Caméras de circulation (v0.6.7, désactivée par défaut) : 680 caméras (position, n°, description, route, région, pont) ; pictogramme de caméra dans le canevas commun, au-dessus des structures ; survol : boucle vidéo MP4 des dernières images, lue en direct sur Québec 511 (`camera.ashx?id=…&format=mp4`), à défaut l'image fixe (`Images/Cameras/<Ville>/cam/<n°>.jpg`, où Québec 511 met son image « non disponible »), à défaut le même message en texte ; clic : carte de Québec 511 centrée au même endroit (`Default.aspx?lat=…&lng=…&zoom=16`) ; v0.6.8 : clic = page officielle de la caméra (`FenetreVideo.html?id=…`, adresse du champ `URL_FLUX_DONNEE` des données ouvertes ; l'ETL signale tout changement de cette adresse), vidéo sans réponse après 12 s = repli, message « Québec 511 refuse sans doute l’affichage hors de son site » après deux caméras refusées de suite ; écran tactile : fenêtre avec vidéo et liens. Rien n'est enregistré ni copié | `etl/cameras.py` | `data/couche-cameras.js` (~73 Ko) | WFS du MTMD `ms:infos_cameras` (jeu « Caméra de circulation », CC BY 4.0) ; images © Québec 511 ([conditions](https://www.quebec511.info/fr/basdepage/Utilisation.aspx)) |
 | Habitats fauniques pour la fenêtre « Environnement » (v0.6.7, pas une couche de la carte) : 2 671 habitats légaux et informationnels (aires de confinement du cerf, héronnières, oiseaux aquatiques, rat musqué, habitat du poisson, HEMV…), contours simplifiés (Douglas-Peucker 12 m, 1e-5 degré, îlots < 0,05 ha omis), boîte englobante par habitat ; « Habitat du poisson (Sans publication) » : point publié gardé ; fiches Données Québec (titre, licence, date) des jeux de la fenêtre | `etl/environnement.py` | `data/couche-environnement.js` (~1,7 Mo, lu à la première ouverture de la fenêtre) | GeoServer du MRNF `Habitats_Fauniques_Pub` (WFS `/ows`, CC BY 4.0) : refuse les requêtes de navigateur (403 avec en-tête Origin), d'où le précalcul ; urllib (le serveur coupe `requests`) |
 
 Lignes simplifiées (Douglas-Peucker, 10 m) et encodées en entiers delta. Les débits sont appariés par n° de route
@@ -97,13 +114,13 @@ nationales 117, 175, 173, 133 et 185, soit ≈ 8 100 km de chaussées (officiel 
 
 ## Visualiseur
 
-`QuickerAtlasOA-vX.Y.Z-AAAA-MM-JJ.html` à la racine (avant la v0.5.1 : `PontsQC-v…` ; versions précédentes dans `old/` ; thème QuickerBridge, Leaflet + fonds Esri, sans clé d'API).
+`QuickerAtlas-vX.Y.Z-AAAA-MM-JJ.html` à la racine (v0.6.8 ; avant : `QuickerAtlasOA-v…`, et `PontsQC-v…` avant la v0.5.1 ; un seul fichier versionné, les précédents sont dans l'historique git ; thème QuickerBridge, Leaflet + fonds Esri, sans clé d'API).
 Charge `data/structures.js` (~2 Mo, format compact décrit dans `etl/build.py`) et `data/details.js` (fiche détaillée, ~2,6 Mo) par `<script src>`,
-puis `data/debits.js` et `data/journal.js`, et à la demande les couches ci-dessus (les ouvrages des villes avec la case
+puis `data/debits.js`, `data/reperes.js` (v0.6.8) et `data/journal.js`, et à la demande les couches ci-dessus (les ouvrages des villes avec la case
 « Inclure les ouvrages des villes ») : s'ouvre directement en `file://` (double-clic) ou via `python -m http.server` à la racine.
 **En ligne** : <https://acheruel.github.io/QuickerAtlas/> (GitHub Pages, branche `main`, racine). Depuis la v0.6.0,
 `index.html` **est** le visualiseur (copie à l'identique du fichier versionné, refaite à chaque publication :
-`cp QuickerAtlasOA-vX.Y.Z-AAAA-MM-JJ.html index.html`) : l'adresse publique reste la racine du site, sans redirection
+`cp QuickerAtlas-vX.Y.Z-AAAA-MM-JJ.html index.html`) : l'adresse publique reste la racine du site, sans redirection
 vers le nom de fichier versionné ; `.nojekyll` désactive Jekyll. Le site n'a besoin que
 des HTML, de `sw.js`, de `js/` et de `data/` (sans `raw/` ni `ponts.sqlite`, exclus par `.gitignore`).
 
@@ -114,7 +131,7 @@ prête `window.QA` (échappement, formats, `fetchT` borné dans le temps corps c
 
 **Interface** (v0.6.6) : nom affiché « QuickerAtlas » ; dépôt renommé `acheruel/QuickerAtlas`, site
 <https://acheruel.github.io/QuickerAtlas/> (l'ancienne adresse `…/QuickerAtlasOA/` répond 404) ; les fichiers versionnés
-gardent le préfixe `QuickerAtlasOA-v…` (lu par `tests/js/viewer_pure.mjs`). Fenêtre d'accueil `<dialog id="welcome">` ouverte à chaque chargement : avertissement « non
+gardaient le préfixe `QuickerAtlasOA-v…` jusqu'à la v0.6.7 ; `QuickerAtlas-v…` depuis la v0.6.8 (lu par `tests/js/viewer_pure.mjs`). Fenêtre d'accueil `<dialog id="welcome">` ouverte à chaque chargement : avertissement « non
 officiel » à accepter (Échap ignoré ; rouverte si le navigateur la ferme sans « J'ai compris ») ; la pastille « Non
 officiel » du bandeau la rouvre. Onglets en boutons avec icônes (`#view-tabs`) : Carte, Liste, Statistiques, Galerie
 (ancienne vue « Défilement », clé `defile` inchangée dans le hash), « Quoi de neuf » (v0.6.7 : onglet à part entière,

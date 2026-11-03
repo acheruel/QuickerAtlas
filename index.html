@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QuickerAtlas v0.6.7 · Atlas d’ouvrages d’art au Québec</title>
+<title>QuickerAtlas v0.6.8 · Atlas d’ouvrages d’art au Québec</title>
 <!-- v0.6.7 : titre et description repris dans l'aperçu des liens partagés (Teams, courriel, réseaux : balises Open Graph) -->
 <meta name="description" content="Visualisation moderne de l’inventaire des structures du MTMD au Québec, avec ma touche personnelle : profil LiDAR, données des cours d’eau, sismiques, etc. ! À partir de données publiques.">
 <meta property="og:type" content="website">
@@ -247,6 +247,7 @@ label{font-size:.875rem}
 .cam-go{display:block;padding:8px 10px;font-weight:600;color:var(--teal);text-decoration:none;border-top:1px solid var(--line)}
 .cam-na{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:14px;background:#fff;color:#1f4f87;text-align:center}
 .cam-na p{margin:0;font-size:.85rem;line-height:1.35}
+.cam-na p.cam-why{font-size:.72rem;color:var(--muted)}   /* v0.6.8 : raison probable du refus */
 .leaflet-popup.cam-pop .leaflet-popup-content-wrapper{padding:0;overflow:hidden;border-radius:10px}
 .leaflet-popup.cam-pop .leaflet-popup-content{margin:0;width:auto!important}
 
@@ -393,6 +394,8 @@ abbr[title]{text-decoration:underline dotted #8aa1ae;text-underline-offset:2px;c
 .dr-sec h3{margin:0 0 6px;font-size:.75rem;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:650;border-bottom:1px solid var(--line);padding-bottom:3px}
 .dr-grid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:0;font-size:.8rem;line-height:1.4}
 .dr-grid dt{color:var(--muted);white-space:nowrap}
+/* v0.6.8 : repère kilométrique (texte sur deux lignes au besoin, source en petit) */
+.dr-grid dd.rk{white-space:normal}.dr-grid dd.rk small{display:block;color:var(--muted);font-size:.7rem}.dr-grid dd.rk small a{color:inherit}
 .dr-grid dd{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dr-grid .dot{width:8px;height:8px;margin-right:4px;vertical-align:-0.5px}
 .dr-side .dr-sec button{font-size:.75rem;padding:4px 9px}
@@ -944,7 +947,7 @@ table.list tbody tr:hover{background:#eef5f7}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="data/structures.js"></script>
 <script src="data/details.js"></script>
-<script>window.PQ_META={"version": "0.6.7", "date": "2026-10-29", "author": "Anthony Chéruel"};</script>
+<script>window.PQ_META={"version": "0.6.8", "date": "2026-11-03", "author": "Anthony Chéruel"};</script>
 <script>
 (function(){
   'use strict';
@@ -2116,33 +2119,51 @@ table.list tbody tr:hover{background:#eef5f7}
     // l'image fixe est gardée un jour en cache par le navigateur : paramètre de la minute courante (comme Québec 511)
     return ville ? camUrl(C.image, { ville: ville, n: m[2] }) + '?t=' + Math.floor(Date.now() / 60000) : null;
   }
+  // v0.6.8 : page officielle de la caméra (champ URL_FLUX_DONNEE des données ouvertes)
+  function camFenetreUrl(C, c){ return C.fenetre ? camUrl(C.fenetre, { id: c[2] }) : null; }
   function camCarteUrl(C, c){ return camUrl(C.carte, { lat: (c[0] / C.echelle).toFixed(5), lon: (c[1] / C.echelle).toFixed(5) }); }
-  var CAM_NA = '<div class="cam-na"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3l18 18M15.5 10.7 21 7v10l-2.2-1.4M14 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1M10 7h4a2 2 0 0 1 2 2v2.5"/></svg>' +
-    '<p>Cette image n’est pas disponible en ce moment.</p><p>Nous nous excusons de cet inconvénient.</p></div>';
+  // v0.6.8 : vidéo ET image refusées → message ; après deux caméras refusées de suite, on dit pourquoi (Québec 511
+  // n'accepte plus l'affichage hors de son site, ou réseau qui le bloque) et où voir la caméra
+  var CAM_ICO = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3l18 18M15.5 10.7 21 7v10l-2.2-1.4M14 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1M10 7h4a2 2 0 0 1 2 2v2.5"/></svg>';
+  var camRefus = 0;                // caméras refusées de suite (remis à 0 dès qu'une vidéo ou une image passe)
+  function camNa(){
+    var h = '<div class="cam-na">' + CAM_ICO + '<p>Cette caméra n’est pas disponible en ce moment.</p>';
+    if (camRefus >= 2) h += '<p class="cam-why">Plusieurs caméras de suite : Québec 511 refuse sans doute l’affichage de ses vidéos hors de son site' +
+      (CAM_TOUCH ? ' (le lien ci-dessous ouvre la caméra chez Québec 511).' : '.') + '</p>';
+    return h + '</div>';
+  }
   function camHtml(C, c, lien){
     var sub = [c[3], c[5] ? 'route ' + c[5] : null, C.regions[c[6]]].filter(Boolean).join(' · ');
     return '<div class="cam-tip"><div class="cam-h">' + camSvg(18) + '<div><b>' + esc(c[7] ? c[7] + ' · ' + c[4] : c[4]) + '</b><small>' + esc(sub) + '</small></div></div>' +
       '<div class="cam-v" data-still="' + esc(camStill(C, c[3]) || '') + '"><span class="ld-spin" aria-hidden="true"></span>' +
       '<video src="' + esc(camUrl(C.video, { id: c[2] })) + '" autoplay muted loop playsinline preload="auto" aria-label="Vidéo en direct de la caméra ' + esc(c[3] || c[2]) + '"></video>' +
       '<span class="cam-live">En direct · Québec 511</span></div>' +
-      (lien ? '<a class="cam-go" href="' + esc(camCarteUrl(C, c)) + '" target="_blank" rel="noopener">Ouvrir dans la carte de Québec 511 ↗</a>' : '<div class="cam-f">Clic : carte de Québec 511 à cet endroit</div>') + '</div>';
+      (lien ? (camFenetreUrl(C, c) ? '<a class="cam-go" href="' + esc(camFenetreUrl(C, c)) + '" target="_blank" rel="noopener">Voir la caméra sur Québec 511 ↗</a>' : '') +
+        '<a class="cam-go" href="' + esc(camCarteUrl(C, c)) + '" target="_blank" rel="noopener">Ouvrir dans la carte de Québec 511 ↗</a>' :
+        '<div class="cam-f">Clic : ' + (camFenetreUrl(C, c) ? 'caméra sur le site de Québec 511' : 'carte de Québec 511 à cet endroit') + '</div>') + '</div>';
   }
   // Lecture lancée dès l'ouverture ; vidéo en échec → image fixe → message
   function camWire(el){
     var box = el && el.querySelector('.cam-v'), v = box && box.querySelector('video');
     if (!v || v.dataset.ok) return;
     v.dataset.ok = '1';
-    var still = box.getAttribute('data-still');
-    function na(){ box.classList.add('ready'); box.innerHTML = CAM_NA; }
-    v.addEventListener('playing', function(){ box.classList.add('ready'); });
-    v.addEventListener('error', function(){
+    var still = box.getAttribute('data-still'), fini = false, delai;
+    function na(){ camRefus++; box.classList.add('ready'); box.innerHTML = camNa(); }
+    // v0.6.8 : repli unique (erreur de la vidéo ou rien après 12 s : Québec 511 qui ne répond pas)
+    function repli(){
+      if (fini) return;
+      fini = true; clearTimeout(delai);
+      v.removeAttribute('src'); v.load();
       if (!still) { na(); return; }
       var im = new Image();
       im.alt = 'Dernière image de la caméra'; im.referrerPolicy = 'no-referrer';
-      im.onload = function(){ box.classList.add('ready'); box.replaceChildren(im); };
+      im.onload = function(){ camRefus = 0; box.classList.add('ready'); box.replaceChildren(im); };
       im.onerror = na;
       im.src = still;
-    });
+    }
+    v.addEventListener('playing', function(){ if (fini) return; fini = true; clearTimeout(delai); camRefus = 0; box.classList.add('ready'); });
+    v.addEventListener('error', repli);
+    delai = setTimeout(repli, 12000);
     var p = v.play && v.play(); if (p && p.catch) p.catch(function(){ /* lecture automatique refusée : l'image reste */ });
   }
   var CAM_TOUCH = window.matchMedia && matchMedia('(hover: none)').matches;
@@ -2167,7 +2188,8 @@ table.list tbody tr:hover{background:#eef5f7}
       });
       m.bindTooltip(function(){ return camHtml(C, c, false); }, { direction: 'top', offset: [0, -4], className: 'cam-tip-wrap', opacity: 1 });
       m.on('tooltipopen', function(e){ camWire(e.tooltip.getElement()); });
-      m.on('click', function(){ window.open(camCarteUrl(C, c), '_blank', 'noopener'); });
+      // v0.6.8 : clic = page officielle de la caméra chez Québec 511 (repli : carte de Québec 511 à cet endroit)
+      m.on('click', function(){ window.open(camFenetreUrl(C, c) || camCarteUrl(C, c), '_blank', 'noopener'); });
       g.addLayer(m);
     });
     return g;
@@ -2359,6 +2381,35 @@ table.list tbody tr:hover{background:#eef5f7}
     return h + '</section>';
   }
 
+  // ---------- Repère kilométrique (v0.6.8) : data/reperes.js (etl/reperes.py, MTMD, CC BY 4.0) ----------
+  // items[n°] = [route, km_a, dist_a_m, km_b|null, km_estimé|null, sens|null, franchie] : repère le plus proche sur la
+  // même route (ou la route franchie), et l'autre repère qui encadre la structure quand elle est entre deux.
+  var nfKm = new Intl.NumberFormat('fr-CA', { maximumFractionDigits: 1 });
+  function rkTexte(R, v){
+    var route = R.routes[v[0]], ka = v[1], d = v[2], kb = v[3], est = v[4];
+    var t = route + ' : ';
+    if (kb != null) t += 'entre km ' + nfKm.format(Math.min(ka, kb)) + ' et km ' + nfKm.format(Math.max(ka, kb)) + (est != null ? ' (≈ km ' + nfKm.format(est) + ')' : '');
+    else if (d <= 60) t += 'au km ' + nfKm.format(ka);
+    else t += 'à ' + (d < 1000 ? nf.format(Math.round(d / 10) * 10) + ' m' : nf1.format(d / 1000) + ' km') + ' du km ' + nfKm.format(ka);
+    return t + (v[6] ? ' (route franchie)' : '');
+  }
+  function rkHtml(o){
+    var R = window.PQ_REPERES, v = R && R.items && R.items[o.num];
+    if (!v) return '';
+    var sens = v[5] != null ? R.sens[v[5]] : null;
+    var title = 'Repère le plus proche : km ' + nfKm.format(v[1]) + ' à ' + nf.format(v[2]) + ' m' + (sens ? ' (panneaux en direction ' + sens.toLowerCase() + ')' : '') +
+      (v[4] != null ? ' ; km estimé par interpolation entre les deux repères' : '') + '. ' + R.attribution;
+    return '<span title="' + esc(title) + '">' + esc(rkTexte(R, v)) + '</span><small>Source : <a href="' + esc(R.source) + '" target="_blank" rel="noopener">Repères kilométriques</a>, MTMD (CC BY 4.0)</small>';
+  }
+  function refreshRk(){
+    var el = $('#dr-rk'), o = selNum != null && byNum[selNum];
+    if (!el) return;
+    var h = o && !o.src ? rkHtml(o) : '';
+    if (h) { el.innerHTML = h; return; }
+    if (el.previousElementSibling) el.previousElementSibling.remove();      // pas de repère : ligne retirée
+    el.remove();
+  }
+
   function ficheHtml(o){
     var secs = [], byName = {};
     function sec(name){
@@ -2378,6 +2429,9 @@ table.list tbody tr:hover{background:#eef5f7}
     add('Localisation', 'Route', o.route);
     add('Localisation', 'Obstacle', o.obstacle);
     if (o.lat != null && o.lon != null) add('Localisation', 'Coordonnées', nf5.format(o.lat) + ', ' + nf5.format(o.lon));
+    // v0.6.8 : repère kilométrique le plus proche (fichier chargé après l'affichage : ligne remplie à son arrivée)
+    if (o.lat != null && (!window.PQ_REPERES || rkHtml(o)))
+      sec('Localisation').rows.push('<dt>Repère km</dt><dd class="rk" id="dr-rk">' + (window.PQ_REPERES ? rkHtml(o) : '<span class="muted">…</span>') + '</dd>');
     // Les détails (OData) donnent des dimensions plus complètes : on n'affiche alors pas les valeurs de base
     var d = detData[o.num];
     if (!d) {
@@ -3582,7 +3636,7 @@ table.list tbody tr:hover{background:#eef5f7}
       if (ov.key === 'pga' || ov.key === 'classes') { h += lgDet(ov, sismiqueLegend(C, ov.key)); return; }
       if (ov.key === 'cameras') {
         h += '<div class="lg-sub">Caméras de circulation</div><div class="lg-chips"><span>' + camSvg(15) + nf.format(C.cameras.length) + ' caméras : ' + (CAM_TOUCH ? 'toucher' : 'survol') + ' = vidéo en direct, ' +
-          (CAM_TOUCH ? 'puis lien' : 'clic') + ' = carte de Québec 511</span></div><div class="lg-src">Positions : <a href="' + esc(C.source) + '" target="_blank" rel="noopener">MTMD, Données Québec</a> (CC BY 4.0) · ' +
+          (CAM_TOUCH ? 'puis liens' : 'clic') + ' = caméra sur le site de Québec 511</span></div><div class="lg-src">Positions : <a href="' + esc(C.source) + '" target="_blank" rel="noopener">MTMD, Données Québec</a> (CC BY 4.0) · ' +
           'images © Québec 511, affichées en direct, sans enregistrement (<a href="' + esc(C.conditions) + '" target="_blank" rel="noopener">conditions</a>)</div>';
         return;
       }
@@ -3857,6 +3911,7 @@ table.list tbody tr:hover{background:#eef5f7}
   writeHash();
   // Débits de circulation et journal : chargés après l'affichage (fiche enrichie dès qu'ils arrivent)
   loadScript('data/debits.js').then(refreshExtra, function(){ /* fichier optionnel */ });
+  loadScript('data/reperes.js').then(refreshRk, refreshRk);        // v0.6.8 : repères kilométriques (fichier optionnel)
   loadScript('data/journal.js').then(journalPret, journalPret);
   loadScript('data/couche-wikiponts.js').then(refreshWikiLinks, function(){ /* fichier optionnel */ });
 })();

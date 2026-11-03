@@ -2,6 +2,8 @@
 import logging
 from pathlib import Path
 
+import pytest
+
 from etl import gps
 
 FIXTURE = Path(__file__).parent / "fixtures" / "gps_extrait.csv"
@@ -74,6 +76,8 @@ def test_trouve_url_csv_dans_la_page_apex():
     )
 
 
+# v0.6.8 : Doc_ref/ n'est pas versionné (copie locale seulement) : test sauté ailleurs (clone neuf, serveur)
+@pytest.mark.skipif(not gps.LOCAL_COPY.exists(), reason="Doc_ref/GPS.csv absent (copie locale non versionnée)")
 def test_repli_local_si_telechargement_echoue(monkeypatch, caplog):
     def boom(*a, **k):
         raise RuntimeError("réseau coupé")

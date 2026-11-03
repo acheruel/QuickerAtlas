@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const html = readdirSync(root).filter(f => /^QuickerAtlasOA-v[\d.]+-[\d-]+\.html$/.test(f)).sort().pop();
+const html = readdirSync(root).filter(f => /^QuickerAtlas-v[\d.]+-[\d-]+\.html$/.test(f)).sort().pop();
 // v0.6.0 : le profil LiDAR est dans js/lidar.js (module à la demande)
 const src = readFileSync(join(root, html), 'utf8') + '\n' + readFileSync(join(root, 'js', 'lidar.js'), 'utf8');
 
@@ -143,4 +143,12 @@ globalThis.fetch = (url, opt) => Promise.resolve({ ok: true, json: () => new Pro
 await assert.rejects(fetchT('x', null, 20, 'json'), e => e.name === 'AbortError');
 globalThis.fetch = () => Promise.resolve({ ok: false, status: 503 });
 await assert.rejects(fetchT('x', null, 50, 'json'), /HTTP 503/);
+// v0.6.8 : texte du repère kilométrique de la fiche
+const rkTexte = fn('rkTexte', "var nf = new Intl.NumberFormat('fr-CA'); var nf1 = new Intl.NumberFormat('fr-CA', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); var nfKm = new Intl.NumberFormat('fr-CA', { maximumFractionDigits: 1 });");
+const RK = { routes: ['Autoroute 40', 'Route 172'], sens: ['Ouest'] };
+assert.equal(rkTexte(RK, [0, 272, 330, 273, 272.3, 0, 0]), 'Autoroute 40 : entre km 272 et km 273 (≈ km 272,3)');
+assert.equal(rkTexte(RK, [0, 5, 120, 4, 4.9, 0, 0]), 'Autoroute 40 : entre km 4 et km 5 (≈ km 4,9)');      // km décroissant
+assert.equal(rkTexte(RK, [1, 18, 40, null, null, null, 0]), 'Route 172 : au km 18');
+assert.equal(rkTexte(RK, [1, 3.3, 1048, null, null, null, 1]), 'Route 172 : à 1,0 km du km 3,3 (route franchie)');
+assert.equal(rkTexte(RK, [1, 18, 456, null, null, null, 0]), 'Route 172 : à 460 m du km 18');
 console.log('viewer_pure : ok (' + html + ')');

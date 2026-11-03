@@ -13,7 +13,7 @@ import pytest
 from etl import sismique as s
 
 FIXTURES = Path(__file__).parent / "fixtures"
-CACHE_API = Path(__file__).resolve().parent.parent / "prototypes" / "sismique" / "cache"
+CACHE_API = Path(__file__).resolve().parent.parent / "data" / "raw" / "sismique-api"   # v0.6.8 : ex-prototypes/sismique/cache (non versionné)
 
 
 # --- Projection ----------------------------------------------------------------------------------

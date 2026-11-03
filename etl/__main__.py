@@ -5,7 +5,7 @@ import sys
 import time
 
 from . import (apex_fiche, apex_list, build, cameras, db, debits, degel, environnement, forestiers, geotech, gps, hauteurs, merge,
-               net, odata, reseaux, sismique, villes, wfs, wikiponts)
+               net, odata, reperes, reseaux, sismique, villes, wfs, wikiponts)
 
 SOURCES = {m.SOURCE: m for m in (wfs, apex_list, hauteurs, gps, odata.TabBord, odata.Limites, odata.HauteursDetail)}
 log = logging.getLogger("etl")
@@ -41,7 +41,7 @@ def main(argv=None) -> int:
     up.add_argument("--no-fetch", action="store_true", help="consolider sans rien télécharger")
     up.add_argument("--sans-couches", action="store_true",
                     help="ne pas régénérer les couches de la carte (routes, rail, géotechnique, débits, villes, forestiers)")
-    co = sub.add_parser("couches", help="régénère les couches de la carte (routes, rail, géotechnique, débits, villes, forestiers, dégel, Wikipédia, habitats fauniques, caméras)")
+    co = sub.add_parser("couches", help="régénère les couches de la carte (routes, rail, géotechnique, débits, repères km, villes, forestiers, dégel, Wikipédia, habitats fauniques, caméras)")
     co.add_argument("--no-fetch", action="store_true", help="relire data/raw/ sans télécharger")
     sub.add_parser("report", help="rapport de jointure entre sources")
     sub.add_parser("export", help="régénère data/structures.js, data/details.js et data/journal.js depuis la base")
@@ -87,7 +87,9 @@ def _couches(fetch: bool) -> bool:
     Les débits s'apparient aux structures : à lancer après la consolidation."""
     ok = True
     etapes = [("réseaux", lambda: reseaux.run(fetch=fetch)), ("géotechnique", lambda: geotech.run(fetch=fetch)),
-              ("débits", lambda: debits.run(fetch=fetch)), ("villes", lambda: villes.run(fetch=fetch)),
+              ("débits", lambda: debits.run(fetch=fetch)),
+              ("repères kilométriques", lambda: reperes.run(fetch=fetch)),    # v0.6.8 : après la consolidation aussi
+              ("villes", lambda: villes.run(fetch=fetch)),
               ("ponts forestiers", lambda: forestiers.run(fetch=fetch)),
               ("sismique", lambda: sismique.run(fetch=fetch)),
               ("zones de dégel", lambda: degel.run(fetch=fetch)),

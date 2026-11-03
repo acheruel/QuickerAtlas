@@ -14,7 +14,8 @@ plus rapide à explorer.
 
 - **Chercher et filtrer** : par nom, route, cours d’eau, municipalité, région, type de pont, année, longueur,
   état (ICG), restrictions (IAS), limitation de poids ou de hauteur.
-- **Lire la fiche d’un ouvrage** : photo, dimensions, état, dernière inspection, trafic, liens vers la fiche et le
+- **Lire la fiche d’un ouvrage** : photo, dimensions, état, dernière inspection, trafic, repère kilométrique le plus
+  proche (ou les deux repères qui l’encadrent), liens vers la fiche et le
   rapport d’inspection officiels du MTMD, et vers Wikipédia pour environ 160 ponts connus.
 - **Changer de point de vue** avec la barre d’onglets : carte, liste exportable (CSV), statistiques cliquables
   (rangées en cinq catégories : vue d’ensemble, régions, âge, caractéristiques, suivi et trafic), galerie (une structure
@@ -32,8 +33,8 @@ Chaque vue garde ses filtres dans l’adresse : copiez le lien pour partager exa
 ## D’où viennent les données ?
 
 Uniquement de **données ouvertes** : inventaire des structures du MTMD et Données Québec (CC-BY 4.0), LiDAR de
-Ressources naturelles Canada, OpenStreetMap, MRNF, CNBC 2020, Wikipédia (CC BY-SA) et Wikidata (CC0). Elles sont mises à jour périodiquement ; la date figure
-en haut à droite de l’atlas.
+Ressources naturelles Canada, OpenStreetMap, MRNF, CNBC 2020, Wikipédia (CC BY-SA) et Wikidata (CC0). Elles sont mises à jour toutes les deux semaines ; la date
+figure en haut à droite de l’atlas.
 
 > Projet personnel et indépendant, **non affilié au MTMD**, pour visualisation et apprentissage seulement : l’atlas
 > le rappelle à chaque démarrage. Pour toute décision, la fiche officielle du Ministère et les normes en vigueur font

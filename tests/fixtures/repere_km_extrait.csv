@@ -1,0 +1,15 @@
+﻿idrepere,norte,affichkm,affichnb,indentier,nomrte,direction,vocation,codemun,nommun,dgt,cs,coordx,coordy,infosuppl,datdebappl,datemodif,codemodif,datfinappl,version,objectid
+16876,00040,km 271,271.0,Oui,autoroute Félix-Leclerc,Est,Routière,34030,Cap-Santé,71,86,-71.768900,46.684640,Correction de position en abord de route,20160510,20230612,MG,,20260601,4344
+16877,00040,km 272,272.0,Oui,autoroute Félix-Leclerc,Est,Routière,34030,Cap-Santé,71,86,-71.755810,46.685047,Correction de position en abord de route,20160510,20230612,MG,,20260601,4345
+16878,00040,km 273,273.0,Oui,autoroute Félix-Leclerc,Est,Routière,34030,Cap-Santé,71,86,-71.743580,46.685450,Correction de position en abord de route,20160510,20230612,MG,,20260601,4346
+16879,00040,km 274,274.0,Oui,autoroute Félix-Leclerc,Est,Routière,34025,Donnacona,71,86,-71.730050,46.685806,Correction de position en abord de route,20160510,20230612,MG,,20260601,4347
+16927,00040,km 271,271.0,Oui,autoroute Félix-Leclerc,Ouest,Routière,34030,Cap-Santé,71,86,-71.768880,46.685550,Correction de position en abord de route,20160510,20230612,MG,,20260601,4395
+16928,00040,km 272,272.0,Oui,autoroute Félix-Leclerc,Ouest,Routière,34030,Cap-Santé,71,86,-71.755910,46.685955,Correction de position en abord de route,20160510,20230612,MG,,20260601,4396
+16929,00040,km 273,273.0,Oui,autoroute Félix-Leclerc,Ouest,Routière,34030,Cap-Santé,71,86,-71.743500,46.686348,Correction de position en abord de route,20160510,20230612,MG,,20260601,4397
+16930,00040,km 274,274.0,Oui,autoroute Félix-Leclerc,Ouest,Routière,34025,Donnacona,71,86,-71.730100,46.686760,Correction de position en abord de route,20160510,20230612,MG,,20260601,4398
+5778,00172,km 20,20.0,Oui,route 172 Nord,,Routière,95010,Sacré-Coeur,67,09,-69.905150,48.268826,Lidar 2022,20090202,20230515,MG,,20260601,3941
+5777,00172,km 18,18.0,Oui,route 172 Nord,,Routière,95010,Sacré-Coeur,67,09,-69.882490,48.261898,Lidar 2022,20090202,20230515,MG,,20260601,3942
+14933,91942,km 228,228.0,Oui,Tronçon Monk,,"Quad, Motoneige",14902,Picard,65,09,-69.481940,47.529090,Motoneige,20141204,,,,20260601,5785
+7745,39322,km 1,1.0,Oui,chemin Fitzpatrick,,Routière,90012,La Tuque,70,06,-72.777710,47.464535,,20081028,,,,20260601,4
+7750,39322,km 6,6.0,Oui,chemin Fitzpatrick,,Routière,90012,La Tuque,70,06,-72.766040,47.507680,,20081028,,,,20260601,5
+7751,39322,km 7,7.0,Oui,chemin de la Rivière-Croche,,Routière,90012,La Tuque,70,06,-72.760230,47.515335,,20081028,,,,20260601,6

@@ -1,4 +1,4 @@
-/* « Cours d'eau au pont » : fenêtre de QuickerAtlasOA pour les ouvrages au-dessus d'un cours d'eau.
+/* « Cours d'eau au pont » : fenêtre de QuickerAtlas pour les ouvrages au-dessus d'un cours d'eau.
    Module chargé à la demande (openAux). Contrat : window.QA_MOD.hydro.render(o, body, ctx).
    Sources (toutes interrogeables depuis le navigateur, CORS ouvert) :
    - MELCCFP, ArcGIS REST : couche 101 (ordre de Strahler), 27 à 34 (bassins nommés), 22 (zones inondables BDZI) ;

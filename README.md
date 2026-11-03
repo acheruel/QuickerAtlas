@@ -11,7 +11,7 @@ bridges, culverts, retaining walls and tunnels. The interface is in French, like
 
 - **Search and filter** by name, road, river, town, region, bridge type, year, length, condition index (ICG),
   load or height restriction.
-- **Open a structure sheet** with its photo, dimensions, condition, last inspection, traffic, and links to the
+- **Open a structure sheet** with its photo, dimensions, condition, last inspection, traffic, nearest kilometre marker (or the two markers around it), and links to the
   official MTMD sheet and inspection report, plus Wikipedia for about 160 well-known bridges.
 - **Switch views** with the tab bar: map, CSV-exportable list, clickable statistics (grouped in five categories:
   overview, regions, age, characteristics, monitoring and traffic), a photo gallery (one structure at a time), "what's new" (changes between data updates and recent inspections), or the list of **notable bridges
@@ -29,7 +29,7 @@ Filters live in the URL, so copying the link shares exactly what you see.
 ## Data
 
 Only **open data**: MTMD structure inventory and Données Québec (CC-BY 4.0), Natural Resources Canada LiDAR,
-OpenStreetMap, MRNF, NBC 2020, Wikipedia (CC BY-SA) and Wikidata (CC0). It is refreshed periodically, and the data date is shown in the atlas header.
+OpenStreetMap, MRNF, NBC 2020, Wikipedia (CC BY-SA) and Wikidata (CC0). It is refreshed every two weeks, and the data date is shown in the atlas header.
 
 > Personal, independent project, **not affiliated with the MTMD**. Values are for exploration and learning only;
 > the atlas asks you to acknowledge this at each start. For any decision, rely on the Ministry's official records

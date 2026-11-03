@@ -1,4 +1,4 @@
-# AGENTS.md — QuickerAtlasOA
+# AGENTS.md — QuickerAtlas
 
 Atlas web des ≈ 11 700 structures du MTMD (Québec) : ETL Python → SQLite → fichiers `data/*.js` → visualiseur HTML
 unique (Leaflet, sans build, sans clé d'API). En ligne : <https://acheruel.github.io/QuickerAtlas/> (GitHub Pages,
@@ -12,6 +12,8 @@ unique (Leaflet, sans build, sans clé d'API). En ligne : <https://acheruel.gith
 - **Données ouvertes seulement**, licence citée dans la fiche/légende. Pas d'images sans licence libre (site public).
 - Requêtes réseau via `etl/net.py` (User-Agent identifié, ≥ 1 s par hôte). Ne pas marteler les serveurs publics.
 - Commentaires et noms en français ; on marque les changements par `// vX.Y.Z : …` (habitude du code, à garder).
+- Nouvelle source de données : prototype ou rapport d'abord (`docs/rapports/` ; le dossier `prototypes/` a été retiré
+  en v0.6.8, un prototype jetable va dans le bloc-notes de la session), intégration seulement si l'utilisateur la valide.
 - Ne pas re-proposer les idées écartées (comparateur, indicateurs de risque, préremplissage QuickerBridge, quiz,
   module autres provinces) ni Structurae en contenu (robots interdits : liens seulement).
 
@@ -19,9 +21,8 @@ unique (Leaflet, sans build, sans clé d'API). En ligne : <https://acheruel.gith
 
 | Chemin | Rôle |
 |---|---|
-| `QuickerAtlasOA-vX.Y.Z-AAAA-MM-JJ.html` | Visualiseur courant (≈ 3 600 lignes, CSS + HTML + JS en un fichier) |
+| `QuickerAtlas-vX.Y.Z-AAAA-MM-JJ.html` | Visualiseur courant (≈ 3 900 lignes, CSS + HTML + JS en un fichier) ; un seul à la racine |
 | `index.html` | **Copie identique** du fichier versionné (page servie par Pages) |
-| `old/` | Versions précédentes du visualiseur (ne pas modifier) |
 | `js/lidar.js`, `js/hydro.js`, `js/sismique.js`, `js/environnement.js` | Modules chargés à la demande (contrat `window.QA_MOD`) |
 | `sw.js` | Service Worker : cache des photos du MTMD (http(s) seulement) |
 | `etl/` | Pipeline Python (`python -m etl …`), un module par source ou couche |
@@ -29,7 +30,7 @@ unique (Leaflet, sans build, sans clé d'API). En ligne : <https://acheruel.gith
 | `data/*.js` | Sorties générées, chargées par `<script src>` (marche en `file://`). **Ne pas éditer à la main** |
 | `data/raw/`, `data/ponts.sqlite` | Téléchargements bruts et base (non versionnés) |
 | `tests/` | pytest + `tests/js/*.mjs` (Node) ; `tests/fixtures/` = extraits réels des sources |
-| `prototypes/` | Essais historiques (hydro, sismique, LiDAR, forestiers, environnement) ; pas utilisés par le site |
+| `outils/` | Scripts Windows de l'extraction automatique (tâche planifiée aux 2 semaines, voir TECHNIQUE.md) |
 | `Doc_ref/` | Références locales (icônes MTMD, PDF) — ignoré par git, ne jamais publier |
 
 ## Commandes
@@ -40,13 +41,18 @@ python -m etl update              # toutes les sources + consolidation + export 
 python -m etl update --only wfs   # une source (wfs, apex_list, hauteurs, gps, odata…)
 python -m etl update --no-fetch   # reconsolider depuis data/raw/
 python -m etl export              # data/structures.js, details.js, journal.js
-python -m etl couches [--no-fetch]  # couches seules (réseaux, géotech, débits, villes, forestiers, sismique, dégel, wikiponts, habitats, caméras)
+python -m etl couches [--no-fetch]  # couches seules (réseaux, géotech, débits, repères km, villes, forestiers, sismique, dégel, wikiponts, habitats, caméras)
 python -m etl report              # rapport de jointure
 python -m pytest                  # tous les tests (Python + Node si présent)
 python -m http.server 8765 --bind 127.0.0.1   # serveur local (config « ponts-web » de .claude/launch.json)
 ```
 
 Une source ou une couche en échec n'arrête pas les autres : lire le journal et le code de retour.
+
+**Extraction automatique** : tâche Windows « QuickerAtlas - extraction » (`outils\planifier-extraction.cmd`), toutes les
+2 semaines depuis le 2026-11-03, sur le PC de l'auteur. Les serveurs du MTMD (APEX, OData) et Québec 511 refusent les IP
+de centres de données (403) : ni GitHub Actions ni une session infonuagique ne peuvent faire l'extraction complète
+(seul le WFS `ws.mapserver…` répond).
 
 ## Architecture
 
@@ -72,14 +78,15 @@ Une source ou une couche en échec n'arrête pas les autres : lire le journal et
 
 ## Publier une version (procédure habituelle)
 
-1. Déplacer l'ancien `QuickerAtlasOA-v….html` dans `old/` (`git mv`), créer le nouveau nom versionné.
+1. Renommer le fichier courant au nouveau nom versionné (`git mv QuickerAtlas-v….html QuickerAtlas-vX.Y.Z-AAAA-MM-JJ.html`) :
+   pas de dossier `old/` depuis la v0.6.8, les versions précédentes restent dans l'historique git.
 2. Mettre à jour dans le HTML : `<title>` et `window.PQ_META = {"version", "date", …}`.
-3. `cp QuickerAtlasOA-vX.Y.Z-AAAA-MM-JJ.html index.html` (toujours identiques).
+3. `cp QuickerAtlas-vX.Y.Z-AAAA-MM-JJ.html index.html` (toujours identiques).
 4. `python -m pytest` vert (`tests/js/viewer_pure.mjs` lit le dernier fichier versionné de la racine).
 5. Vérifier dans le navigateur (console sans erreur, largeurs 1440 / 800 / 375 px).
 6. Rapport `docs/rapports/AAAA-MM-JJ-vX.Y.Z-rapport-de-version.md` (+ page Notion, comme d'habitude) ;
    mettre à jour `docs/TECHNIQUE.md` et les README si l'usage change.
-7. Commit `QuickerAtlasOA vX.Y.Z : résumé` ; **push seulement sur demande explicite** (Pages se met à jour en ~1 min).
+7. Commit `QuickerAtlas vX.Y.Z : résumé` ; **push seulement sur demande explicite** (Pages se met à jour en ~1 min).
 
 ## Pièges connus
 

@@ -411,6 +411,8 @@ def run(fetch: bool = True) -> dict:
         content = (RAW_DIR / RAW_NAME).read_bytes()
     sections = parse(content)
     structures = charger_structures()
+    if not structures:     # v0.6.8 : base vide (clone neuf) → ne pas écraser data/debits.js par un fichier sans appariement
+        raise RuntimeError("débits : aucune structure dans la base (lancer d'abord python -m etl update)")
     match, st = construire(sections, structures)
     payload = build_payload(sections, match)
     size = write(payload)
