@@ -419,6 +419,10 @@ abbr[title]{text-decoration:underline dotted #8aa1ae;text-underline-offset:2px;c
 .mtip-l{padding:5px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mtip-l small{color:var(--muted)}
 .line-tip{font-size:.75rem;padding:2px 7px}
+/* v0.6.9 : bulle compacte des débits (3 lignes courtes, tronçon coupé par « … ») */
+.traf-tip{max-width:220px;line-height:1.3}
+.traf-tip small{display:block;font-size:.6875rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.traf-tip small.traf-an{display:inline}
 /* Numéros au-dessus des points (zoom ≥ 12 depuis v0.6.4 ; étiquettes qui se chevauchent omises) */
 .num-lbl{background:none;border:0}
 .num-lbl span{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font:600 12px/1 "Segoe UI",Arial,sans-serif;color:#102d41;background:#ffffffd9;border-radius:3px;padding:1px 3px;box-shadow:0 0 0 1px #102d4122}
@@ -1844,13 +1848,16 @@ table.list tbody tr:hover{background:#eef5f7}
   // débits d'abord) ; gris pointillé = non disponible. v0.6.9 : plus de tirets pour un DJMA d'une année antérieure
   // (même trait et même légende que le DJMA le plus récent ; l'année reste écrite dans la bulle).
   var TRAFIC_Z = 11, TRAFIC_ND_DASH = '2 4';
+  // v0.6.9 : bulle compacte (≈ 220 px au lieu de 350) : débit et année, puis été · hiver · camions, puis le tronçon
+  // (coupé par « … » s'il est long) ; sans le n° de section
   function trafTip(T, i){
     var x = T.sections[i];
     if (!x) return '';
-    var h = '<b>' + (x[3] != null ? 'DJMA ' + x[4] + ' : ' + nf.format(x[3]) + ' véh./j' : 'DJMA non disponible') + '</b>' +
-      '<br><small>' + esc([x[1], x[2]].filter(Boolean).join(' → ')) + ' · section ' + esc(x[0]) + '</small>';
-    var ext = [x[5] != null ? 'été ' + nf.format(x[5]) : null, x[6] != null ? 'hiver ' + nf.format(x[6]) : null, x[7] != null ? nf1.format(x[7]) + ' % de camions' : null].filter(Boolean);
-    return h + (ext.length ? '<br><small>' + ext.join(' · ') + '</small>' : '');
+    var h = x[3] != null ? '<b>' + nf.format(x[3]) + ' véh./j</b> <small class="traf-an">DJMA ' + x[4] + '</small>' : '<b>DJMA non disponible</b>';
+    var ext = [x[5] != null ? 'Été ' + nf.format(x[5]) : null, x[6] != null ? 'hiver ' + nf.format(x[6]) : null, x[7] != null ? nf1.format(x[7]) + ' % camions' : null].filter(Boolean);
+    var de = [x[1], x[2]].filter(Boolean).join(' → ');
+    return '<div class="traf-tip">' + h + (ext.length ? '<small>' + ext.join(' · ') + '</small>' : '') +
+      (de ? '<small class="traf-de">' + esc(de) + '</small>' : '') + '</div>';
   }
   // point à mi-longueur d'une ligne (coordonnées monde au zoom 0)
   function midLine(w){
