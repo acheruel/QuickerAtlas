@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QuickerAtlas v0.6.8 · Atlas d’ouvrages d’art au Québec</title>
+<title>QuickerAtlas v0.6.9 · Atlas d’ouvrages d’art au Québec</title>
 <!-- v0.6.7 : titre et description repris dans l'aperçu des liens partagés (Teams, courriel, réseaux : balises Open Graph) -->
 <meta name="description" content="Visualisation moderne de l’inventaire des structures du MTMD au Québec, avec ma touche personnelle : profil LiDAR, données des cours d’eau, sismiques, etc. ! À partir de données publiques.">
 <meta property="og:type" content="website">
@@ -247,7 +247,6 @@ label{font-size:.875rem}
 .cam-go{display:block;padding:8px 10px;font-weight:600;color:var(--teal);text-decoration:none;border-top:1px solid var(--line)}
 .cam-na{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:14px;background:#fff;color:#1f4f87;text-align:center}
 .cam-na p{margin:0;font-size:.85rem;line-height:1.35}
-.cam-na p.cam-why{font-size:.72rem;color:var(--muted)}   /* v0.6.8 : raison probable du refus */
 .leaflet-popup.cam-pop .leaflet-popup-content-wrapper{padding:0;overflow:hidden;border-radius:10px}
 .leaflet-popup.cam-pop .leaflet-popup-content{margin:0;width:auto!important}
 
@@ -947,7 +946,7 @@ table.list tbody tr:hover{background:#eef5f7}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="data/structures.js"></script>
 <script src="data/details.js"></script>
-<script>window.PQ_META={"version": "0.6.8", "date": "2026-11-03", "author": "Anthony Chéruel"};</script>
+<script>window.PQ_META={"version": "0.6.9", "date": "2026-11-04", "author": "Anthony Chéruel"};</script>
 <script>
 (function(){
   'use strict';
@@ -1782,7 +1781,9 @@ table.list tbody tr:hover{background:#eef5f7}
   }) : null;
   // Infobulle collante dont le texte suit la ligne survolée (une seule couche pour des milliers de lignes)
   function lineTips(fl){
-    fl.bindTooltip(function(){ return fl._hit ? fl._hit.tip : ''; }, { sticky: true, className: 'line-tip' });
+    // v0.6.9 : bulle à 16 px du curseur (+ 6 px de marge Leaflet) : la flèche ou la main ne cache plus le début des
+    // lignes (« été … » des débits), à droite comme à gauche
+    fl.bindTooltip(function(){ return fl._hit ? fl._hit.tip : ''; }, { sticky: true, className: 'line-tip', offset: [16, 0] });
     fl.on('mousemove', function(){
       if (fl._hit === fl._tipFor) return;
       fl._tipFor = fl._hit;
@@ -1840,12 +1841,13 @@ table.list tbody tr:hover{background:#eef5f7}
   // Comme la carte des débits du MTMD : chaque section de trafic colorée selon son DJMA le plus récent (classes et
   // teintes du MTMD, clarté ajustée pour les daltoniens), trait plus épais pour les classes plus chargées, DJMA écrit
   // sur la plus longue partie de chaque section dès le zoom TRAFIC_Z (étiquettes qui se chevauchent omises, gros
-  // débits d'abord) ; tirets = DJMA d'une année antérieure ; gris pointillé = non disponible.
-  var TRAFIC_Z = 11, TRAFIC_DASH = '7 4', TRAFIC_ND_DASH = '2 4';
+  // débits d'abord) ; gris pointillé = non disponible. v0.6.9 : plus de tirets pour un DJMA d'une année antérieure
+  // (même trait et même légende que le DJMA le plus récent ; l'année reste écrite dans la bulle).
+  var TRAFIC_Z = 11, TRAFIC_ND_DASH = '2 4';
   function trafTip(T, i){
     var x = T.sections[i];
     if (!x) return '';
-    var h = '<b>' + (x[3] != null ? 'DJMA ' + x[4] + ' : ' + nf.format(x[3]) + ' véh./j' : 'DJMA non disponible') + '</b>' + (x[4] != null && x[4] < T.annee ? ' <small>(pas de valeur ' + T.annee + ')</small>' : '') +
+    var h = '<b>' + (x[3] != null ? 'DJMA ' + x[4] + ' : ' + nf.format(x[3]) + ' véh./j' : 'DJMA non disponible') + '</b>' +
       '<br><small>' + esc([x[1], x[2]].filter(Boolean).join(' → ')) + ' · section ' + esc(x[0]) + '</small>';
     var ext = [x[5] != null ? 'été ' + nf.format(x[5]) : null, x[6] != null ? 'hiver ' + nf.format(x[6]) : null, x[7] != null ? nf1.format(x[7]) + ' % de camions' : null].filter(Boolean);
     return h + (ext.length ? '<br><small>' + ext.join(' · ') + '</small>' : '');
@@ -1891,19 +1893,19 @@ table.list tbody tr:hover{background:#eef5f7}
     if (!T) return g;
     var ND = T.classes.length - 1, lots = {}, lbls = [];
     T.lines.forEach(function(a){
-      var e = encLine(a, 3), c = a[0], old = a[2] & 1, key = c + '-' + old, x = T.sections[a[1]];
+      var e = encLine(a, 3), c = a[0], x = T.sections[a[1]];
       e.tip = trafTip(T, a[1]);
-      (lots[key] = lots[key] || { c: c, old: old, lines: [] }).lines.push(e);
+      (lots[c] = lots[c] || { c: c, lines: [] }).lines.push(e);
       if ((a[2] & 2) && x && x[3] != null) lbls.push({ m: midLine(e.w), txt: nf.format(x[3]), c: T.classes[c].color, n: x[3] });
     });
     lbls.sort(function(p, q){ return q.n - p.n; });            // gros débits étiquetés d'abord
     var list = Object.keys(lots).map(function(k){ return lots[k]; }).sort(function(p, q){ return (p.c !== ND) - (q.c !== ND) || p.c - q.c; });
     // liseré foncé sous chaque classe connue (comme le trait noir de la carte du MTMD : lisible sur les routes jaunes et
-    // orange du fond), puis un lot par classe et par fraîcheur de la valeur (« non disponible » dessous, gros débits dessus)
+    // orange du fond), puis un lot par classe (« non disponible » dessous, gros débits dessus)
     var cas = list.filter(function(B){ return B.c !== ND; }).map(function(B){ return { lines: B.lines, color: '#102d41', weight: T.classes[B.c].weight + 2.2, opacity: 0.85, cap: 'butt' }; });
     var fl = new TraficLines(cas.concat(list.map(function(B){
       var cl = T.classes[B.c];
-      return { lines: B.lines, tip: true, color: cl.color, weight: cl.weight, opacity: 1, cap: 'butt', dash: B.c === ND ? TRAFIC_ND_DASH : (B.old ? TRAFIC_DASH : null) };
+      return { lines: B.lines, tip: true, color: cl.color, weight: cl.weight, opacity: 1, cap: 'butt', dash: B.c === ND ? TRAFIC_ND_DASH : null };
     })));
     fl._lbls = lbls;
     g.addLayer(lineTips(fl));
@@ -1971,7 +1973,7 @@ table.list tbody tr:hover{background:#eef5f7}
     var R = couche('reperes'), g = L.layerGroup();
     if (!R) return g;
     var lyr = new RepereLayer(R);
-    lyr.bindTooltip(function(){ return lyr._hit ? rkTip(R, lyr._hit) : ''; }, { sticky: true, className: 'line-tip' });
+    lyr.bindTooltip(function(){ return lyr._hit ? rkTip(R, lyr._hit) : ''; }, { sticky: true, className: 'line-tip', offset: [16, 0] });   // v0.6.9 : à l'écart du curseur
     lyr.on('mousemove', function(){ if (lyr._hit === lyr._tipFor) return; lyr._tipFor = lyr._hit; if (lyr.isTooltipOpen()) lyr.getTooltip().update(); });
     g.addLayer(lyr);
     return g;
@@ -2263,16 +2265,10 @@ table.list tbody tr:hover{background:#eef5f7}
   // v0.6.8 : page officielle de la caméra (champ URL_FLUX_DONNEE des données ouvertes)
   function camFenetreUrl(C, c){ return C.fenetre ? camUrl(C.fenetre, { id: c[2] }) : null; }
   function camCarteUrl(C, c){ return camUrl(C.carte, { lat: (c[0] / C.echelle).toFixed(5), lon: (c[1] / C.echelle).toFixed(5) }); }
-  // v0.6.8 : vidéo ET image refusées → message ; après deux caméras refusées de suite, on dit pourquoi (Québec 511
-  // n'accepte plus l'affichage hors de son site, ou réseau qui le bloque) et où voir la caméra
+  // v0.6.8 : vidéo ET image refusées → message. v0.6.9 : sans le message « Plusieurs caméras de suite… » (fausse piste :
+  // la vidéo passe dans Edge et pas dans Firefox, sur le même réseau ; voir le rapport de la v0.6.9)
   var CAM_ICO = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3l18 18M15.5 10.7 21 7v10l-2.2-1.4M14 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1M10 7h4a2 2 0 0 1 2 2v2.5"/></svg>';
-  var camRefus = 0;                // caméras refusées de suite (remis à 0 dès qu'une vidéo ou une image passe)
-  function camNa(){
-    var h = '<div class="cam-na">' + CAM_ICO + '<p>Cette caméra n’est pas disponible en ce moment.</p>';
-    if (camRefus >= 2) h += '<p class="cam-why">Plusieurs caméras de suite : Québec 511 refuse sans doute l’affichage de ses vidéos hors de son site' +
-      (CAM_TOUCH ? ' (le lien ci-dessous ouvre la caméra chez Québec 511).' : '.') + '</p>';
-    return h + '</div>';
-  }
+  function camNa(){ return '<div class="cam-na">' + CAM_ICO + '<p>Cette caméra n’est pas disponible en ce moment.</p></div>'; }
   function camHtml(C, c, lien){
     var sub = [c[3], c[5] ? 'route ' + c[5] : null, C.regions[c[6]]].filter(Boolean).join(' · ');
     return '<div class="cam-tip"><div class="cam-h">' + camSvg(18) + '<div><b>' + esc(c[7] ? c[7] + ' · ' + c[4] : c[4]) + '</b><small>' + esc(sub) + '</small></div></div>' +
@@ -2289,7 +2285,7 @@ table.list tbody tr:hover{background:#eef5f7}
     if (!v || v.dataset.ok) return;
     v.dataset.ok = '1';
     var still = box.getAttribute('data-still'), fini = false, delai;
-    function na(){ camRefus++; box.classList.add('ready'); box.innerHTML = camNa(); }
+    function na(){ box.classList.add('ready'); box.innerHTML = camNa(); }
     // v0.6.8 : repli unique (erreur de la vidéo ou rien après 12 s : Québec 511 qui ne répond pas)
     function repli(){
       if (fini) return;
@@ -2298,11 +2294,11 @@ table.list tbody tr:hover{background:#eef5f7}
       if (!still) { na(); return; }
       var im = new Image();
       im.alt = 'Dernière image de la caméra'; im.referrerPolicy = 'no-referrer';
-      im.onload = function(){ camRefus = 0; box.classList.add('ready'); box.replaceChildren(im); };
+      im.onload = function(){ box.classList.add('ready'); box.replaceChildren(im); };
       im.onerror = na;
       im.src = still;
     }
-    v.addEventListener('playing', function(){ if (fini) return; fini = true; clearTimeout(delai); camRefus = 0; box.classList.add('ready'); });
+    v.addEventListener('playing', function(){ if (fini) return; fini = true; clearTimeout(delai); box.classList.add('ready'); });
     v.addEventListener('error', repli);
     delai = setTimeout(repli, 12000);
     var p = v.play && v.play(); if (p && p.catch) p.catch(function(){ /* lecture automatique refusée : l'image reste */ });
@@ -3793,8 +3789,8 @@ table.list tbody tr:hover{background:#eef5f7}
         var ndT = C.classes.length - 1;
         h += lgDet(ov, '<div class="lg-chips">' + C.classes.map(function(cl, i){
           return '<span>' + trafSwatch(cl, i === ndT ? TRAFIC_ND_DASH : null, i !== ndT) + esc(cl.label) + (i === ndT ? '' : ' véh./j') + '</span>';
-        }).join('') + '<span>' + trafSwatch({ color: '#fde047', weight: 3.5 }, TRAFIC_DASH, true) + 'DJMA d’une année avant ' + C.annee + '</span></div>' +
-          '<div class="lg-src">DJMA le plus récent (' + C.annee + ' en général), écrit sur la carte dès le zoom ' + TRAFIC_Z + ' ; classes de la carte des débits du MTMD. ' +
+        }).join('') + '</div>' +
+          '<div class="lg-src">DJMA le plus récent de chaque section (' + C.annee + ' en général ; l’année est dans la bulle), écrit sur la carte dès le zoom ' + TRAFIC_Z + ' ; classes de la carte des débits du MTMD. ' +
           '<a href="' + esc(C.source) + '" target="_blank" rel="noopener">MTMD, Données Québec</a> (CC BY 4.0)</div>');
         return;
       }
