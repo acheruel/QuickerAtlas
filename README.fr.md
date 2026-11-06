@@ -35,6 +35,11 @@ plus rapide à explorer.
   humides, zones inondables et espèces envahissantes à 1, 2 ou 5 km), aléa sismique du code national du bâtiment.
   **Climat futur** : températures et précipitations passées et futures à l’ouvrage (scénarios CMIP6 d’ECCC, référence
   1971-2000 ou 2021-2050).
+- **Bloc de terrain pour BridgeSketch 3D** (v0.7.2) : le bouton **Bloc 3D** (sous « Couches » ou dans une fiche) permet de
+  tracer un rectangle de 1,5 km au plus, d’en extraire le relief LiDAR 1 m (sol et surface), l’image satellite et l’eau, les
+  forêts et les routes d’OpenStreetMap, de repérer cours d’eau, forêts et routes d’après les couleurs de l’image
+  (zones à corriger, supprimer ou ajouter ; axe du pont à placer), puis d’envoyer le bloc à BridgeSketch 3D ou d’en
+  faire un fichier `.bs3dterrain` (format : [docs/bs3d-terrain-v1.md](docs/bs3d-terrain-v1.md)).
 
 Chaque vue garde ses filtres dans l’adresse : copiez le lien pour partager exactement ce que vous voyez.
 

@@ -7,7 +7,8 @@
    v0.6.1 : pentes de la route portée au meilleur de trois modèles (droite, parabole, double pente : ldGrade), équation de la
    parabole, alerte au-delà de 5 %.
    v0.6.2 : axe de la route portée lu sur le relief quand OSM et le masque de l'ouvrage manquent (ldReliefAxis) ; alerte de
-   pente à ± 10 % sur la pente affichée (et non plus sur le bout éloigné de la fenêtre) ; équation z = a + b·x + x²/c. */
+   pente à ± 10 % sur la pente affichée (et non plus sur le bout éloigné de la fenêtre) ; équation z = a + b·x + x²/c.
+   v0.7.2 : ldWcsBox / ldImgBox (emprise rectangulaire, pas du raster) exposés par _geo pour js/bloc3d.js. */
 (function(){
   'use strict';
   window.QA_MOD = window.QA_MOD || {};
@@ -65,13 +66,18 @@
     var v = D.a[r * D.w + c];
     return isFinite(v) ? Math.round(v * 100) / 100 : null;
   }
-  function ldWcs(kind, cx, cy, half){
-    var q = 'service=WCS&version=1.1.1&request=GetCoverage&identifier=' + kind + '&boundingbox=' + [cx - half, cy - half, cx + half, cy + half].map(function(v){ return v.toFixed(1); }).join(',') + ',urn:ogc:def:crs:EPSG::3857&format=image/geotiff';
+  // v0.7.2 : emprise rectangulaire (bb = [xmin, ymin, xmax, ymax] en Mercator) et, si `step` est donné, pas du raster en m Mercator
+  // (GridOffsets du WCS 1.1.1 ; sans lui, le serveur choisit ≈ 1,94 m Mercator par pixel) ; `ms` = délai par essai.
+  // Utilisé aussi par js/bloc3d.js (Bloc 3D pour BridgeSketch 3D) via QA_MOD.lidar._geo.
+  function ldWcsBox(kind, bb, step, ms){
+    var q = 'service=WCS&version=1.1.1&request=GetCoverage&identifier=' + kind + '&boundingbox=' + bb.map(function(v){ return v.toFixed(1); }).join(',') + ',urn:ogc:def:crs:EPSG::3857&format=image/geotiff';
+    if (step) q += '&GridBaseCRS=urn:ogc:def:crs:EPSG::3857&GridCS=urn:ogc:def:cs:OGC:0.0:Grid2dSquareCS&GridType=urn:ogc:def:method:WCS:1.1:2dGridIn2dCrs&GridOffsets=' + step.toFixed(4) + ',-' + step.toFixed(4);
     // le serveur répond parfois par une erreur sans en-tête CORS (« Failed to fetch ») : deux nouvelles tentatives espacées
-    var get = function(){ return fetchT(LD_WCS + '?' + q, null, 25000, 'arrayBuffer'); };
+    var get = function(){ return fetchT(LD_WCS + '?' + q, null, ms || 25000, 'arrayBuffer'); };
     var wait = function(ms){ return new Promise(function(res){ setTimeout(res, ms); }); };
     return get().catch(function(){ return wait(1500).then(get); }).catch(function(){ return wait(4000).then(get); }).then(ldTiff);
   }
+  function ldWcs(kind, cx, cy, half){ return ldWcsBox(kind, [cx - half, cy - half, cx + half, cy + half]); }
   function ldOsm(lat, lon){
     var a = 'around:70,' + lat + ',' + lon;
     var q = '[out:json][timeout:8];(way(' + a + ')[highway];way(' + a + ')[waterway];way(' + a + ')[railway];);out geom;';
@@ -203,13 +209,17 @@
   // « Access-Control-Allow-Origin: * » : l'image lue par fetch puis createImageBitmap ne « salit » pas le canevas,
   // les pixels sont lisibles. Pas d'image (réseau, navigateur ancien) : les calculs se font sur le LiDAR seul.
   function ldImg(cx, cy, half, k){
+    var n = Math.max(256, Math.min(2048, Math.round(2 * half / k / 0.7)));
+    return ldImgBox([cx - half, cy - half, cx + half, cy + half], n, n);
+  }
+  // v0.7.2 : même export sur une emprise quelconque, nw × nh pixels ; `buf` = JPEG tel que reçu (réutilisé pour le paquet BridgeSketch 3D)
+  function ldImgBox(bb, nw, nh, ms){
     if (!window.createImageBitmap) return Promise.reject(new Error('createImageBitmap absent'));
-    var n = Math.max(256, Math.min(2048, Math.round(2 * half / k / 0.7))), bb = [cx - half, cy - half, cx + half, cy + half];
-    var url = ESRI + 'World_Imagery/MapServer/export?bbox=' + bb.map(function(v){ return v.toFixed(1); }).join(',') + '&bboxSR=3857&imageSR=3857&size=' + n + ',' + n + '&format=jpg&f=image';
-    return fetchT(url, null, 20000, 'arrayBuffer').then(function(buf){ return createImageBitmap(new Blob([buf], { type: 'image/jpeg' })); }).then(function(bm){
+    var url = ESRI + 'World_Imagery/MapServer/export?bbox=' + bb.map(function(v){ return v.toFixed(1); }).join(',') + '&bboxSR=3857&imageSR=3857&size=' + nw + ',' + nh + '&format=jpg&f=image', jpg;
+    return fetchT(url, null, ms || 20000, 'arrayBuffer').then(function(buf){ jpg = buf; return createImageBitmap(new Blob([buf], { type: 'image/jpeg' })); }).then(function(bm){
       var cv = document.createElement('canvas'); cv.width = bm.width; cv.height = bm.height;
       var g = cv.getContext('2d'); g.drawImage(bm, 0, 0);
-      return { px: g.getImageData(0, 0, bm.width, bm.height).data, w: bm.width, h: bm.height, X0: bb[0], Y0: bb[3], sx: (bb[2] - bb[0]) / bm.width, sy: (bb[3] - bb[1]) / bm.height };
+      return { px: g.getImageData(0, 0, bm.width, bm.height).data, w: bm.width, h: bm.height, X0: bb[0], Y0: bb[3], sx: (bb[2] - bb[0]) / bm.width, sy: (bb[3] - bb[1]) / bm.height, buf: jpg };
     });
   }
   // Couleur moyenne de l'image sur un carré de (2r + 1)² pixels autour de (x, y) (Mercator) ; null hors image
@@ -1142,5 +1152,7 @@
   });
   window.QA_MOD.lidar = { open: openLidar,
     // fonctions exposées pour les essais (console, tests/js/viewer_pure.mjs extrait les pures par leur nom)
+    // v0.7.2 : outils réseau et GeoTIFF réutilisés par js/bloc3d.js (pas de second analyseur GeoTIFF)
+    _geo: { merc: ldMerc, unmerc: ldUnmerc, tiff: ldTiff, wcsBox: ldWcsBox, imgBox: ldImgBox },
     _t: { ldLoad: ldLoad, ldCompute: ldCompute, ldDsmFilt: ldDsmFilt, ldRgbClass: ldRgbClass, ldRgbAt: ldRgbAt, ldRunAt: ldRunAt, ldMerc: ldMerc, ldSamp: ldSamp } };
 })();

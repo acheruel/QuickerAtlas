@@ -30,6 +30,11 @@ bridges, culverts, retaining walls and tunnels. The interface is in French, like
   flood zones and invasive species within 1, 2 or 5 km. The seismic tool shows the National Building Code hazard.
   The **future climate** tool shows temperature and precipitation changes at the structure (ECCC CMIP6 scenarios,
   reference 1971-2000 or 2021-2050).
+- **Send a terrain block to BridgeSketch 3D** (v0.7.2): the **Bloc 3D** button (under "Couches", or on a structure sheet) lets you
+  draw a rectangle up to 1.5 km on the map, extracts the 1 m LiDAR terrain (ground and surface models), the satellite image
+  and the OpenStreetMap water, forest and roads, detects river, forest and road zones from the image colours (you can
+  edit, delete or add zones and place the bridge axis), then sends the block to BridgeSketch 3D or saves a
+  `.bs3dterrain` file (format: [docs/bs3d-terrain-v1.md](docs/bs3d-terrain-v1.md)).
 
 Filters live in the URL, so copying the link shares exactly what you see.
 

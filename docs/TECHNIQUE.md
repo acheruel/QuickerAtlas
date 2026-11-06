@@ -132,6 +132,30 @@ officiel en v0.7.1) et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR »,
 contrat `window.QA_MOD.lidar.open(o)`) ne sont chargés qu'à la première ouverture. Contrat : `window.QA_MOD[clé].render(o, body, ctx)` ; la page leur
 prête `window.QA` (échappement, formats, `fetchT` borné dans le temps corps compris, `loadScript`, `distM`, `det`).
 
+**Bloc 3D pour BridgeSketch 3D** (v0.7.2) : `js/bloc3d.js` (interface : rectangle, extraction, zones modifiables, axe du pont,
+envoi), `js/bloc3d-calc.js` (fonctions pures, sans DOM ni réseau, testées par `tests/js/bloc3d_calc.mjs`) et `js/lidar.js`
+(GeoTIFF, WCS et Esri, exposés par `QA_MOD.lidar._geo` : `wcsBox(kind, bb, step, ms)`, `imgBox(bb, nw, nh, ms)`) sont chargés
+à la première ouverture du bouton « Bloc 3D » (panneau des couches ou fiche). Le paquet `bs3d-terrain` v1 est décrit dans
+[bs3d-terrain-v1.md](bs3d-terrain-v1.md) (copie du contrat partagé avec BridgeSketch 3D).
+- **Repère** : grille locale centrée sur le bloc, x vers l'est, y vers le nord, mètres au sol (Mercator × cos φ), ligne 0 au
+  nord ; pas de 1 m jusqu'à 1,5 M de cellules, sinon 2 m ; côté ≤ 1 500 m.
+- **Extraction** : MNT puis MNS du WCS de RNCan (`GridOffsets` = pas voulu en Mercator ; sans lui le serveur sert ≈ 1,94 m
+  Mercator par pixel, soit ≈ 1,3 m au sol), un seul GeoTIFF par grille (1 224 × 1 224 pixels répondent en 3 s ; pas de
+  tuiles nécessaires jusqu'à 1,5 km), deux requêtes WCS espacées de 1,2 s, avec 3 essais comme le profil LiDAR ; export
+  Esri sur l'emprise exacte de la grille (≤ 2 048 px, ≥ 0,5 m/pixel) ; Overpass (eau, cours d'eau, forêts, routes, ponts :
+  40 s sur le serveur principal, 2 miroirs de repli à 12 s, bouton « Continuer sans OpenStreetMap »).
+- **Détection** (`detect`) : image agrégée sur une grille de 2 m (3 m au-delà de 1 km) ; pour chaque cellule, couleur moyenne,
+  texture (écart-type de la luminance), hauteur MNS − MNT et part de MNT sans donnée ; classes `classifyCell` (eau : bleutée ou
+  très sombre, lisse, au ras du sol, ou sans retour LiDAR ; forêt : vert sombre avec canopée ≥ 2,5 m, ou texture forte sans MNS ;
+  route : gris peu saturé, lisse, ni toit ni arbre) ; majorité 3 × 3 ; les zones OSM l'emportent (cellules déjà couvertes retirées
+  de la détection, par type) ; eau et forêt : fermeture, composantes, contour extérieur, Douglas-Peucker (0,9 cellule) ;
+  routes : ouverture, retrait des surfaces de plus de 28 m de large, squelette de Zhang-Suen, plus long chemin (branches
+  reprises), largeur par transformée en distance. Les trous des polygones sont ignorés (un seul anneau par zone).
+- **Envoi** : mode `?bs3d=1` (ouvert par BridgeSketch 3D) → `window.opener.postMessage(paquet, '*', transférables)` ; sinon
+  `window.open(BS3D_URL + '#terrain-import')`, attente de `{ type: 'bs3d-ready' }` (60 s), puis envoi ; `BS3D_URL` peut être
+  remplacée par `localStorage['qa-bs3d-url']`. « Télécharger .bs3dterrain » = JSON avec grilles en base64. Aucune donnée n'est
+  conservée ou envoyée ailleurs qu'à BridgeSketch 3D.
+
 **Interface** (v0.6.6) : nom affiché « QuickerAtlas » ; dépôt renommé `acheruel/QuickerAtlas`, site
 <https://acheruel.github.io/QuickerAtlas/> (l'ancienne adresse `…/QuickerAtlasOA/` répond 404) ; les fichiers versionnés
 gardaient le préfixe `QuickerAtlasOA-v…` jusqu'à la v0.6.7 ; `QuickerAtlas-v…` depuis la v0.6.8 (lu par `tests/js/viewer_pure.mjs`). Fenêtre d'accueil `<dialog id="welcome">` ouverte à chaque chargement : avertissement « non
