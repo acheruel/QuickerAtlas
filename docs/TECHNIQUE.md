@@ -127,8 +127,8 @@ vers le nom de fichier versionné ; `.nojekyll` désactive Jekyll. Le site n'a b
 des HTML, de `sw.js`, de `js/` et de `data/` (sans `raw/` ni `ponts.sqlite`, exclus par `.gitignore`).
 
 **Modules à la demande** (v0.5.6) : `js/hydro.js` (fenêtre « Cours d'eau au pont »), `js/sismique.js` (fenêtre « Aléa
-sismique »), `js/environnement.js` (v0.6.7, fenêtre « Environnement »), les prototypes `js/vue3d.js` et `js/climat.js`
-(v0.7.0) et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR »,
+sismique »), `js/environnement.js` (v0.6.7, fenêtre « Environnement »), `js/climat.js` (« Climat futur », v0.7.0,
+officiel en v0.7.1) et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR »,
 contrat `window.QA_MOD.lidar.open(o)`) ne sont chargés qu'à la première ouverture. Contrat : `window.QA_MOD[clé].render(o, body, ctx)` ; la page leur
 prête `window.QA` (échappement, formats, `fetchT` borné dans le temps corps compris, `loadScript`, `distM`, `det`).
 
@@ -167,21 +167,35 @@ photo Wikipédia d'abord et bascule « Wikipédia / MTMD » (`wikiImg`), lien Wi
 (boutons en tirets « proto ») : `js/vue3d.js` (« Vue 3D du site ») et `js/climat.js` (« Climat futur »), même contrat
 `QA_MOD[clé].render` que les autres modules.
 
-**Vue 3D du site** (prototype v0.7.0, `js/vue3d.js`) : bloc de 1 km **au sol** autour de l'ouvrage (en EPSG:3857 :
-1000 / cos(lat) m), MNT ou MNS du WCS du Data Cube (`dtm`/`dsm`, grille imposée 400 × 400 ≈ 2,5 m par `GridOffsets`,
-≈ 0,6 Mo par couche), drapé de l'export Esri World_Imagery (1024 px, CORS ouvert) ou relief seul ; Three.js r147
-(`three.min.js` + `OrbitControls.js`, jsDelivr) chargé à la demande ; exagération 1× à 3×, boussole, échelle 1 km,
-rendu à la demande ; hors LiDAR (< 5 % de données) : message ; tout est libéré à la fermeture.
+**v0.7.1** : « Réinitialiser les filtres » en tête du panneau (`.input-top`) ; bouton maison revenu sous « Masquer »
+(`.lc-home`, `flyToBounds(QC_VUE)`). **Exporter** : le menu s'ouvre au survol de la souris (`pointerenter` /
+`pointerleave` avec délai de 280 ms ; tactile et clavier : clic). CSV et **GeoJSON** (`buildGeojson`) partagent
+`EXP_COLS` / `expVals`. **KMZ** simplifié (`buildKml`) : un seul dossier « QuickerAtlas », repère standard de Google
+Earth (aucun style), nom « n° — nom », fiche résumée + photo au clic, plus de lien vers l'atlas. **Fiches PDF**
+(50 structures au plus) : jsPDF 2.5.1 (cdnjs, empreinte SRI, `loadLib`) chargé au premier export ; une fiche Lettre par
+ouvrage (`pdfFiche`, `pdfBuild`, `pdfSections`) : en-tête, ICG et IAS (pastille + texte), liens cliquables (fiche
+d'inventaire et rapport d'inspection du MTMD, Google Maps, photo du MTMD, Wikipédia), photo Wikipédia sinon vue aérienne
+Esri (export World_Imagery ≥ 400 m de large ; Esri répond 500 si on demande plus fin que l'imagerie : nouvel essai 4 fois
+plus large), carte de situation (export World_Street_Map, 14 km), repère et échelle dessinés sur le canevas, toutes les
+sections de la fiche (`ficheSecs`, partagée avec `ficheHtml`), débits et journal ; deux colonnes équilibrées, page de
+suite si besoin. Texte limité au jeu WinAnsi des polices standard (`pdfTxt` : apostrophes, tirets, « ≈ »… remplacés ;
+espaces insécables gardés). Plusieurs fiches : archive `.zip` (`zipFiles`, fichiers stockés). La photo du MTMD ne peut
+pas être intégrée : son serveur n'envoie pas d'en-tête CORS et répond 403 dès qu'un en-tête Origin est présent.
+Ponts remarquables : une section `<details>` par province (cadre, compteur, tout replier / déplier ; le lien d'une
+province rouvre sa section sans toucher au hash). **Vue 3D** retirée de l'atlas (`js/vue3d.js` et son test déplacés
+dans `BridgeSketch 3D/prototypes/vue3d-site/`, avec une page autonome) : plus aucun appel à Three.js.
 
-**Climat futur** (prototype v0.7.0, `js/climat.js`) : cellule de 1/12° (≈ 6 × 10 km) qui contient l'ouvrage, sans note
-de risque. (1) GeoMet-Climate d'ECCC (WMS `GetFeatureInfo`, `info_format=text/plain` : plusieurs couches par requête ;
-`application/json` n'en accepte qu'une), couches CanDCS-U6 (CMIP6, BCCAQv2, 26 modèles)
+**Climat futur** (`js/climat.js`, v0.7.0, officiel en v0.7.1) : cellule de 1/12° (≈ 6 × 10 km) qui contient l'ouvrage,
+sans note de risque. GeoMet-Climate d'ECCC (WMS `GetFeatureInfo`, `info_format=text/plain` : plusieurs couches par
+requête ; `application/json` n'en accepte qu'une), couches CanDCS-U6 (CMIP6, BCCAQv2, 26 modèles)
 `CanDCSU6-<SSP>_<AirTemp|AirTempMax|AirTempMin|Precip>-Pct<10|50|90>_1971-2000_P0Y[-saison]` et
-`…<VAR>Anomaly-Pct…_<2021-2050|2041-2070|2071-2100>_P0Y[-saison]` (écarts de précipitations en mm, pas en %).
-(2) API OGC `climate:indices:{historical|projected}/coverage` (CMIP5, CanDCS-U5, RCP ; `bbox` + `subset=percentile(n),scenario(RCP…)`
-obligatoires, sinon toute la grille) pour jours > 30 °C, nuits tropicales, degrés-jours et jours de pluie : lente
-(5 à 55 s), affichée après les lignes CMIP6. Pas de jours de gel, cycles gel-dégel ni pluie max. 1 j / 5 j dans ces
-sources. CORS ouvert ; Licence du gouvernement ouvert – Canada.
+`…<VAR>Anomaly-Pct…_<2021-2050|2041-2070|2071-2100>_P0Y[-saison]` (écarts de précipitations en mm, pas en %) ; seules
+les périodes utiles sont demandées (`PERS_V`). 14 indices en 4 thèmes, une icône chacun. Référence au choix (v0.7.1) :
+1971-2000 (écart = changement médian, plage p10–p90 du changement) ou 2021-2050 (valeur = base + écart 2021-2050 ;
+écart = différence des médianes, sans plage ; horizons antérieurs ou égaux désactivés). v0.7.1 : indices CMIP5 de l'API
+OGC (jours > 30 °C, nuits tropicales, degrés-jours, jours de pluie : 5 à 60 s) et volet « autres saisons » retirés ;
+fenêtre de 620 px (`#aux-dialog[data-kind=climat]`), sans défilement à 900 px de haut. Pas de jours de gel, cycles
+gel-dégel ni pluie max. 1 j / 5 j dans cette source. CORS ouvert ; Licence du gouvernement ouvert – Canada.
 
 **LiDAR** (MNEHR 1 m de Ressources naturelles Canada, Licence du gouvernement ouvert – Canada) : fonds « Relief ombré
 MNT / MNS » en tuiles WMS, et bouton « Profil LiDAR » de la fiche, calculé à la demande dans le navigateur (WCS en

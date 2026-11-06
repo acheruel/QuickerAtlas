@@ -18,7 +18,9 @@ plus rapide à explorer.
 - **Lire la fiche d’un ouvrage** : photo, dimensions, état, dernière inspection, trafic, repère kilométrique le plus
   proche (ou les deux repères qui l’encadrent), liens vers la fiche et le
   rapport d’inspection officiels du MTMD, et vers Wikipédia pour environ 160 ponts connus.
-- **Exporter** les structures filtrées avec le bouton « Exporter » : CSV (tableur) ou KMZ (Google Earth).
+- **Exporter** les structures filtrées avec le bouton « Exporter » (s’ouvre au survol) : CSV (tableur), KMZ (Google
+  Earth), GeoJSON (SIG) ou **fiches PDF** (une fiche imprimable par ouvrage : photo, carte de situation, état, liens
+  vers la fiche d’inventaire du MTMD ; plusieurs fiches arrivent en .zip).
 - **Changer de point de vue** avec la barre d’onglets : carte, liste, statistiques cliquables
   (rangées en cinq catégories : vue d’ensemble, régions, âge, caractéristiques, suivi et trafic), galerie (une structure
   à la fois, en photo), « Quoi de neuf » (changements entre les mises à jour et inspections récentes), ou
@@ -31,8 +33,8 @@ plus rapide à explorer.
 - **Outils d’ingénierie** (dans la fiche) : profil LiDAR (hauteur sous l’ouvrage, pentes), cours d’eau et débits au
   pont, **environnement** (aires protégées, habitats fauniques et floristiques, espèces en situation précaire, milieux
   humides, zones inondables et espèces envahissantes à 1, 2 ou 5 km), aléa sismique du code national du bâtiment.
-  Deux prototypes à l’essai : **vue 3D du site** (bloc LiDAR de 1 km² avec l’image satellite) et **climat futur**
-  (scénarios climatiques d’ECCC à l’ouvrage).
+  **Climat futur** : températures et précipitations passées et futures à l’ouvrage (scénarios CMIP6 d’ECCC, référence
+  1971-2000 ou 2021-2050).
 
 Chaque vue garde ses filtres dans l’adresse : copiez le lien pour partager exactement ce que vous voyez.
 

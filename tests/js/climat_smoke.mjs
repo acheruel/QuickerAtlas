@@ -1,7 +1,6 @@
 // Test de fumée de js/climat.js (sans navigateur ni réseau) : `node tests/js/climat_smoke.mjs`
-//  - noms de couches CanDCS-U6, URL GetFeatureInfo et API OGC ;
-//  - analyse d'une réponse GetFeatureInfo réelle (tests/fixtures/climat_gfi_precip.txt) et d'une réponse CoverageJSON réelle
-//    (tests/fixtures/climat_coverage_rcp45_p50.json, Montréal/Laval, RCP4.5, percentile 50) ;
+//  - noms de couches CanDCS-U6, URL GetFeatureInfo (v0.7.1 : plus d'API OGC ni d'indices CMIP5) ;
+//  - analyse d'une réponse GetFeatureInfo réelle (tests/fixtures/climat_gfi_precip.txt) ;
 //  - cellule de grille, formatage français, assemblage des lignes et du tableau (flèche et signe, jamais la couleur seule).
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
@@ -73,40 +72,6 @@ ok('GetFeatureInfo : couche sans valeur (hors grille) → null ; entrée invalid
   assert.equal(T.parseGfi("Layer 'Z'\n value_0 = 'nodata'").vals.Z, null);
 });
 
-ok('URL de l’API OGC : historique et projections', function(){
-  var c = { lat: 45.625, lon: -73.7083 };
-  var u = T.urlIdx(true, c, 95, 'RCP8.5', '2006/2100');
-  assert.ok(u.indexOf('https://api.weather.gc.ca/collections/climate:indices:projected/coverage?f=json&bbox=') === 0);
-  assert.ok(/properties=tx30,tn20,cdd,hdd,prep1&datetime=2006\/2100&subset=percentile\(95\),scenario\(RCP8\.5\)$/.test(u), u);
-  assert.ok(/bbox=-73\.7283,45\.6050,-73\.6883,45\.6450/.test(u));
-  var h = T.urlIdx(false, c, 5, null, '1971/2000');
-  assert.ok(/climate:indices:historical\/coverage/.test(h) && /subset=percentile\(5\)$/.test(h) && !/scenario/.test(h));
-});
-
-var COV = null;
-ok('CoverageJSON réel (RCP4.5, p50) : années et séries', function(){
-  COV = T.parseCoverage(JSON.parse(fix('climat_coverage_rcp45_p50.json')));
-  assert.equal(COV.years.length, 95); assert.equal(COV.years[0], 2006); assert.equal(COV.years[94], 2100);
-  ['tx30', 'tn20', 'cdd', 'hdd', 'prep1'].forEach(function(k){ assert.equal(COV.props[k].length, 95, k); });
-  assert.equal(COV.props.tx30[35], 27);                   // 2041 : 27 jours (même valeur que GetFeatureInfo)
-  proche(COV.x, -73.7083, 1e-3); proche(COV.y, 45.625, 1e-3);
-  assert.deepEqual(T.parseCoverage(null).years, []);
-  assert.deepEqual(T.parseCoverage({ domain: {}, ranges: {} }).years, []);
-});
-
-ok('moyenne : fenêtre de 4 ans', function(){
-  assert.equal(T.moyenne([2001, 2002, 2003, 2004], [1, 2, 3, 4], 2002, 2003), 2.5);
-});
-
-ok('moyenne : au moins 80 % des années exigées', function(){
-  assert.equal(T.moyenne([1, 2, 3, 4, 5], [1, 2, 3, 4, 5], 1, 5), 3);
-  assert.equal(T.moyenne([1, 2, 3, 4, 5], [1, null, 3, 4, 5], 1, 5), 13 / 4);       // 4 sur 5 = 80 %
-  assert.equal(T.moyenne([1, 2, 3, 4, 5], [1, null, null, 4, 5], 1, 5), null);      // 3 sur 5 : trop peu
-  assert.equal(T.moyenne([], [], 2041, 2070), null);
-  var m = T.moyenne(COV.years, COV.props.tx30, 2041, 2070);
-  assert.ok(m > 20 && m < 35, String(m));
-});
-
 ok('formatage : virgule, vrai signe moins, flèche', function(){
   assert.equal(T.fmt(11.104, 1), '11,1');
   assert.equal(T.fmt(-13.04, 1), '−13,0');
@@ -120,22 +85,16 @@ ok('formatage : virgule, vrai signe moins, flèche', function(){
   assert.equal(T.fleche(3.1, 1), '▲'); assert.equal(T.fleche(-0.5, 1), '▼'); assert.equal(T.fleche(0.01, 1), '=');
 });
 
-// Données de Montréal/Laval (SSP2-4.5, 2041-2070) arrondies : valeurs observées lors de la recherche
+// Données de Montréal/Laval (SSP2-4.5) arrondies : référence 1971-2000 et écarts de deux horizons
 function jeu(){
-  var D = { base: {}, ano: {}, idxH: {}, idxF: {} };
+  var D = { base: {}, ano: {} };
   T.VARS.forEach(function(v){ T.PERS.forEach(function(per){
     [10, 50, 90].forEach(function(p, i){
       D.base[T.layerBase('SSP245', v, p, per)] = (v === 'Precip' ? 970 : 10) + i;
       D.ano[T.layerAno('SSP245', v, p, '2041-2070', per)] = (v === 'Precip' ? 50 : 2) + i * 2;
+      D.ano[T.layerAno('SSP245', v, p, '2021-2050', per)] = (v === 'Precip' ? 20 : 1) + i;
     });
   }); });
-  var ans = []; for (var y = 1971; y <= 2000; y++) ans.push(y);
-  [5, 50, 95].forEach(function(p, i){
-    D.idxH[p] = { years: ans, props: {
-      tx30: ans.map(function(y){ return (y % 2 ? 8 : 10) + i; }), tn20: ans.map(function(){ return 4; }), cdd: ans.map(function(){ return 250; }),
-      hdd: ans.map(function(){ return 4500; }), prep1: ans.map(function(){ return 137; }) } };
-    D.idxF[p] = { years: COV.years, props: { tx30: COV.years.map(function(){ return 30 + i * 10; }), tn20: COV.years.map(function(){ return 15; }), cdd: COV.years.map(function(){ return 500; }), hdd: COV.years.map(function(){ return 3700; }), prep1: COV.years.map(function(){ return 138; }) } };
-  });
   return D;
 }
 
@@ -150,49 +109,51 @@ ok('lignes : référence + écart = futur, plage des écarts, pourcentage des pl
   assert.equal(t.fut.lo, 11 + 2); assert.equal(t.fut.hi, 11 + 6);     // plage = changement p10–p90 appliqué à la médiane de référence
   var p = par.p;
   assert.equal(p.ec.v, 52); proche(p.ec.pct, 100 * 52 / 971);
-  assert.equal(par['t-djf'].ec.pct, null);                            // pas de pourcentage pour une température
+  assert.equal(par['tn-djf'].ec.pct, null);                           // pas de pourcentage pour une température
 });
 
-ok('lignes (indices CMIP5) : moyenne des années, écart de médianes', function(){
-  var rows = T.buildRows(jeu(), 'SSP245', '2041-2070'), ix;
-  rows.forEach(function(r){ if (r.def.id === 'tx30') ix = r; });
-  assert.equal(ix.base.v, 10);           // p50 : moyenne de 9 et 11 (années alternées) ; p5 : 9 ; p95 : 11
-  assert.equal(ix.base.lo, 9); assert.equal(ix.base.hi, 11);
-  assert.equal(ix.fut.v, 40); assert.equal(ix.fut.lo, 30); assert.equal(ix.fut.hi, 50);
-  assert.equal(ix.ec.v, 30); assert.equal(ix.ec.lo, null);
-  assert.equal(ix.etat, 'ok');
+ok('v0.7.1 : référence 2021-2050 = base + écart 2021-2050 ; écart = différence des médianes, sans plage', function(){
+  var par = {}; T.buildRows(jeu(), 'SSP245', '2041-2070', '2021-2050').forEach(function(r){ par[r.def.id] = r; });
+  var t = par.t;
+  assert.equal(t.base.v, 11 + 2); assert.equal(t.base.lo, 11 + 1); assert.equal(t.base.hi, 11 + 3);
+  assert.equal(t.fut.v, 15); assert.equal(t.ec.v, 2); assert.equal(t.ec.lo, null);
+  var p = par.p;
+  assert.equal(p.base.v, 971 + 21); assert.equal(p.ec.v, 52 - 21); proche(p.ec.pct, 100 * 31 / 992);
+  var D = jeu(); delete D.ano[T.layerAno('SSP245', 'AirTemp', 50, '2021-2050', '')];
+  assert.equal(T.buildRows(D, 'SSP245', '2041-2070', '2021-2050')[0].etat, 'nd');
 });
 
 ok('lignes : données pas encore reçues → « att » ; valeur manquante → « nd »', function(){
-  var vide = T.buildRows({ base: null, ano: null, idxH: null, idxF: null }, 'SSP245', '2041-2070');
+  var vide = T.buildRows(null, 'SSP245', '2041-2070');
   assert.ok(vide.every(function(r){ return r.etat === 'att'; }));
   var D = jeu(); delete D.ano[T.layerAno('SSP245', 'AirTemp', 50, '2041-2070', '')];
   var rows = T.buildRows(D, 'SSP245', '2041-2070');
   assert.equal(rows[0].etat, 'nd'); assert.equal(rows[0].fut.v, null);
-  var D2 = jeu(); D2.idxF[50] = { years: [2041], props: { tx30: [1] } };       // une seule année sur 30 : trop peu
-  var r2 = T.buildRows(D2, 'SSP245', '2041-2070').filter(function(r){ return r.def.id === 'tx30'; })[0];
-  assert.equal(r2.etat, 'nd');
 });
 
-ok('tableau : thèmes, étiquette CMIP5, flèche ET signe, autres saisons repliées', function(){
+ok('tableau : 4 thèmes, icône par indice, flèche ET signe, plus de CMIP5 ni d’autres saisons', function(){
   var rows = T.buildRows(jeu(), 'SSP245', '2041-2070');
-  var html = T.tableHtml(rows, { hor: '2041-2070', rcp: 'RCP4.5', saisons: false });
+  var html = T.tableHtml(rows, { hor: '2041-2070', ref: '1971-2000' });
   ['Températures', 'Gel et dégel', 'Chaleur', 'Précipitations'].forEach(function(g){ assert.ok(html.indexOf('>' + g + '<') > 0, g); });
-  assert.ok(html.indexOf('Autres saisons') < 0);
-  assert.ok(html.indexOf('>CMIP5<') > 0);
-  assert.ok(/▲ \+4,0/.test(html), 'flèche + signe');
-  assert.ok(html.indexOf('1971-2000') > 0 && html.indexOf('2041–2070') > 0);
-  var plein = T.tableHtml(rows, { hor: '2041-2070', rcp: 'RCP4.5', saisons: true });
-  assert.ok(plein.indexOf('Autres saisons') > 0);
-  var att = T.tableHtml(T.buildRows({ base: null, ano: null, idxH: null, idxF: null }, 'SSP245', '2041-2070'), { hor: '2041-2070', rcp: 'RCP4.5', saisons: false });
+  assert.ok(html.indexOf('Autres saisons') < 0 && html.indexOf('CMIP5') < 0);
+  assert.ok(/▲ \+4,0/.test(html), 'flèche + signe');
+  assert.ok(html.indexOf('1971–2000') > 0 && html.indexOf('2041–2070') > 0);
+  assert.equal((html.match(/class="cl-ic"/g) || []).length, T.DEFS.length);
+  var h2 = T.tableHtml(T.buildRows(jeu(), 'SSP245', '2041-2070', '2021-2050'), { hor: '2041-2070', ref: '2021-2050' });
+  assert.ok(h2.indexOf('>2021–2050<') > 0);
+  var att = T.tableHtml(T.buildRows(null, 'SSP245', '2041-2070'), { hor: '2041-2070' });
   assert.ok(att.indexOf('chargement') > 0);
 });
 
-ok('données : 3 scénarios, 3 horizons, indices uniques', function(){
+ok('données : 3 scénarios, 3 horizons, 2 références, 14 indices uniques avec icône, couches utiles seulement', function(){
   assert.deepEqual(T.SSPS.map(function(s){ return s.k; }), ['SSP126', 'SSP245', 'SSP585']);
   assert.deepEqual(T.HORS.map(function(h){ return h.k; }), ['2021-2050', '2041-2070', '2071-2100']);
+  assert.deepEqual(T.REFS, ['1971-2000', '2021-2050']);
+  assert.equal(T.DEFS.length, 14);
   assert.equal(new Set(T.DEFS.map(function(d){ return d.id; })).size, T.DEFS.length);
-  T.DEFS.forEach(function(d){ assert.ok(d.g >= 0 && d.g < T.GROUPES.length); assert.ok(d.v || d.idx); });
+  T.DEFS.forEach(function(d){ assert.ok(d.g >= 0 && d.g < T.GROUPES.length); assert.ok(d.v); assert.ok(T.ICONES[d.id], d.id); });
+  assert.equal(T.layersVar('SSP245', 'AirTemp', null).length, 3);             // annuel seulement
+  assert.equal(T.layersVar('SSP245', 'AirTempMin', '2041-2070').length, 15);
 });
 
 console.log(n + ' tests OK');

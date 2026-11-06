@@ -23,7 +23,7 @@ unique (Leaflet, sans build, sans clé d'API). En ligne : <https://acheruel.gith
 |---|---|
 | `QuickerAtlas-vX.Y.Z-AAAA-MM-JJ.html` | Visualiseur courant (≈ 3 900 lignes, CSS + HTML + JS en un fichier) ; un seul à la racine |
 | `index.html` | **Copie identique** du fichier versionné (page servie par Pages) |
-| `js/lidar.js`, `js/hydro.js`, `js/sismique.js`, `js/environnement.js` | Modules chargés à la demande (contrat `window.QA_MOD`) |
+| `js/lidar.js`, `js/hydro.js`, `js/sismique.js`, `js/environnement.js`, `js/climat.js` | Modules chargés à la demande (contrat `window.QA_MOD`) |
 | `sw.js` | Service Worker : cache des photos du MTMD (http(s) seulement) |
 | `etl/` | Pipeline Python (`python -m etl …`), un module par source ou couche |
 | `etl/donnees/` | Grilles versionnées (classes de site, masque d'eau) |

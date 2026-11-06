@@ -172,12 +172,36 @@ assert.equal(numLbl({ num: 'M-1', fam: 'pont', src: 'mtl' }), 'M-1');
 // v0.7.0 : KMZ — CRC-32 (valeur de référence de « 123456789 ») et KML bien formé, échappé, groupé par ICG
 const crc32 = fn('crc32', 'var CRC_T = null;');
 assert.equal(crc32(new TextEncoder().encode('123456789')), 0xCBF43926);
-const buildKml = fn('buildKml', extract('kmlEsc') + extract('kmlColor'));
-const kml = buildKml([{ num: '04296', nom: 'Pont <A & B>', lat: 46.7, lon: -71.3, icg: '2' }, { num: '1', lat: 45, lon: -73, icg: null }],
-  { colors: { '2': '#ef6c00', SO: '#8c969d' }, labels: { '2': 'Travaux majeurs' }, link: o => 'https://x/#s=' + o.num, title: 'T' });
-assert.ok(kml.includes('<color>ff006cef</color>'));                        // #ef6c00 → aabbggrr
-assert.ok(kml.includes('Pont &lt;A &amp; B&gt;'));
+// v0.7.1 : un seul dossier « QuickerAtlas », repère standard (aucun style), n° et nom, sans lien vers l'atlas
+const buildKml = fn('buildKml', extract('kmlEsc'));
+const kml = buildKml([{ num: '04296', nom: 'Pont <A & B>', lat: 46.7, lon: -71.3, icg: '2' }, { num: '1', lat: 45, lon: -73, icg: null }], { title: 'QuickerAtlas' });
+assert.ok(kml.includes('<name>QuickerAtlas</name>'));
+assert.ok(kml.includes('<name>04296 — Pont &lt;A &amp; B&gt;</name>') && kml.includes('<name>1</name>'));
 assert.ok(kml.includes('<coordinates>-71.300000,46.700000,0</coordinates>'));
-assert.ok(kml.includes('ICG 2 — Travaux majeurs (1)') && kml.includes('ICG S. O. / inconnu (1)'));
+assert.ok(!/<Style|<styleUrl|<Folder|<a href/.test(kml));
 assert.equal((kml.match(/<Placemark>/g) || []).length, 2);
+// v0.7.1 : GeoJSON (mêmes champs que le CSV)
+const EXP = 'var EXP_COLS = ' + src.match(/var EXP_COLS = (\[[^\]]*\]);/)[1] + ';' + extract('expVals');
+const gj = JSON.parse(fn('buildGeojson', EXP)([{ num: '04296', nom: 'Pont', lat: 46.7, lon: -71.3, icg: '2', pub: 1 }], { a: 1 }));
+assert.equal(gj.type, 'FeatureCollection');
+assert.deepEqual(gj.features[0].geometry, { type: 'Point', coordinates: [-71.3, 46.7] });
+assert.equal(gj.features[0].properties.num, '04296');
+assert.equal(gj.features[0].properties.gestionnaire, 'MTMD');
+assert.equal(gj.features[0].properties.route, null);
+assert.equal(Object.keys(gj.features[0].properties).length, 28);
+// v0.7.1 : archive ZIP de plusieurs fichiers (fiches PDF) : en-têtes locaux, répertoire central, nombre d'entrées
+const zipFiles = fn('zipFiles', 'var CRC_T = null;' + extract('crc32'));
+const enc = s => new TextEncoder().encode(s);
+const zb = new Uint8Array(await zipFiles([{ name: 'a.pdf', raw: enc('AAA'), packed: enc('AAA'), method: 0 }, { name: 'b.pdf', raw: enc('BB'), packed: enc('BB'), method: 0 }]).arrayBuffer());
+const dv = new DataView(zb.buffer), eocd = zb.length - 22;
+assert.equal(dv.getUint32(0, true), 0x04034b50);
+assert.equal(dv.getUint32(30 + 5 + 3, true), 0x04034b50);           // 2e en-tête local après « a.pdf » + 3 octets
+assert.equal(dv.getUint32(eocd, true), 0x06054b50);
+assert.equal(dv.getUint16(eocd + 10, true), 2);
+const cenOff = dv.getUint32(eocd + 16, true);
+assert.equal(dv.getUint32(cenOff, true), 0x02014b50);
+assert.equal(dv.getUint32(cenOff + 46 + 5 + 42, true), 38);          // décalage du 2e fichier dans le répertoire central
+// v0.7.1 : texte des fiches PDF (polices standard WinAnsi)
+const pdfTxt = fn('pdfTxt', 'var PDF_CAR = ' + src.match(/var PDF_CAR = (\{[^\n]*\});/)[1] + ';');
+assert.equal(pdfTxt('Rivière « l’Anse » — 12\u202f345 m ≈ œuvre ↗'), 'Rivière « l\'Anse » - 12\u00a0345 m ~ oeuvre');   // milliers insécables
 console.log('viewer_pure : ok (' + html + ')');
