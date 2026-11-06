@@ -10,12 +10,14 @@ bridges, culverts, retaining walls and tunnels. The interface is in French, like
 ## What it does
 
 - **Search and filter** by name, road, river, town, region, bridge type, year, length, condition index (ICG),
-  load or height restriction.
+  load or height restriction. Paste a list of structure numbers to see several structures at once (one tag each).
 - **Open a structure sheet** with its photo, dimensions, condition, last inspection, traffic, nearest kilometre marker (or the two markers around it), and links to the
   official MTMD sheet and inspection report, plus Wikipedia for about 160 well-known bridges.
-- **Switch views** with the tab bar: map, CSV-exportable list, clickable statistics (grouped in five categories:
-  overview, regions, age, characteristics, monitoring and traffic), a photo gallery (one structure at a time), "what's new" (changes between data updates and recent inspections), or the list of **notable bridges
-  of Canada** (Wikipedia): gold stars on the map, kept out of filters and statistics.
+- **Export** the filtered structures with the "Exporter" button: CSV (spreadsheet) or KMZ (Google Earth).
+- **Switch views** with the tab bar: map, list, clickable statistics (grouped in five categories:
+  overview, regions, age, characteristics, monitoring and traffic), a photo gallery (one structure at a time), "what's new" (changes between data updates and recent inspections), or **notable bridges**:
+  MTMD structures that have a Wikipedia article (with its photo), then Canadian bridges outside the inventory (gold
+  stars on the map, kept out of filters and statistics).
 - **Add layers**: road and rail networks, rivers, geotechnical boreholes, seismic hazard and site classes, MTMD
   spring-thaw zones, **traffic volumes** (AADT on the whole network, like the MTMD map), kilometre markers,
   **Québec 511 traffic cameras** (live video on hover), other bridges outside the MTMD inventory
@@ -24,6 +26,8 @@ bridges, culverts, retaining walls and tunnels. The interface is in French, like
   road grades from 1 m elevation models, computed live in your browser (inset above). The river tool shows flows at
   the bridge. The environment tool lists protected areas, wildlife and plant habitats, species at risk, wetlands,
   flood zones and invasive species within 1, 2 or 5 km. The seismic tool shows the National Building Code hazard.
+  Two prototypes are on trial: a **3D site view** (1 km² LiDAR block draped with satellite imagery) and **future
+  climate** (ECCC climate scenarios at the structure).
 
 Filters live in the URL, so copying the link shares exactly what you see.
 

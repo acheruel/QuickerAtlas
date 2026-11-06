@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QuickerAtlas v0.6.9 · Atlas d’ouvrages d’art au Québec</title>
+<title>QuickerAtlas v0.7.0 · Atlas d’ouvrages d’art au Québec</title>
 <!-- v0.6.7 : titre et description repris dans l'aperçu des liens partagés (Teams, courriel, réseaux : balises Open Graph) -->
 <meta name="description" content="Visualisation moderne de l’inventaire des structures du MTMD au Québec, avec ma touche personnelle : profil LiDAR, données des cours d’eau, sismiques, etc. ! À partir de données publiques.">
 <meta property="og:type" content="website">
@@ -93,6 +93,19 @@ label{font-size:.875rem}
 .check{display:flex;align-items:center;gap:8px;margin-bottom:0}
 .hint{margin:3px 0 0 25px;font-size:.75rem;line-height:1.4;color:var(--muted)}
 .check span{margin:0;color:var(--ink);font-size:.875rem}
+/* v0.7.0 : étiquettes de recherche dans le champ (n° de structure ou mots ; « ? » = n° introuvable) */
+.field>.tagbox{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0;padding:3px;border:1px solid #cbd8e1;border-radius:5px;background:#fff;color:var(--ink);cursor:text}
+.tagbox:focus-within{outline:2px solid var(--teal);outline-offset:-1px}
+.tagbox input{flex:1 1 120px;min-width:100px;border:0;min-height:28px;padding:3px 5px}
+.tagbox input:focus{outline:none}
+.tags{display:contents}
+.tag{display:inline-flex;align-items:center;gap:2px;max-width:100%;padding:1px 2px 1px 7px;border-radius:12px;background:#e3f1ef;border:1px solid #9ccfc8;color:#00534f;font-size:.78rem;font-weight:600;line-height:1.5}
+.tag.txt{background:#eef2f6;border-color:#c5d3dd;color:var(--ink);font-weight:500}
+.tag.miss{background:#fff;border:1px dashed #a50026;color:#7a001c}
+.tag b{font-weight:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag button{border:0;background:none;color:inherit;width:18px;height:18px;border-radius:50%;padding:0;font-size:.9rem;line-height:1;cursor:pointer}
+.tag button:hover{background:#0000001a}
+#q-hint{margin:6px 0 0}
 .check-row{display:flex;align-items:center;gap:6px;margin-top:8px}
 .check-row .field{margin:0;flex:1;min-width:0}
 .info-i{position:relative;flex:none;width:17px;height:17px;border-radius:50%;border:1px solid #9fb2bf;color:var(--muted);font:italic 700 .7rem/15px Georgia,serif;text-align:center;cursor:help;user-select:none}
@@ -134,6 +147,19 @@ label{font-size:.875rem}
 .view-tabs button.active{background:var(--teal);border-color:var(--teal);color:#fff;box-shadow:0 1px 3px #00736d55}
 .view-tabs button.active svg{color:#fff}
 .view-tabs .tab-c{display:none}
+/* v0.7.0 : bouton « Exporter » (menu CSV / KMZ) à droite des onglets */
+.exp{position:relative;flex:none}
+.exp-btn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border:1px solid #cdd9e2;border-radius:9px;background:#fff;color:var(--ink);font-weight:600;white-space:nowrap}
+.exp-btn:hover,.exp-btn[aria-expanded=true]{background:#eef5f7;color:var(--teal);border-color:var(--teal)}
+.exp-btn svg{color:#4d6a7b}
+.exp-menu{position:absolute;z-index:1200;top:40px;left:0;width:290px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px #102d4129;padding:6px}
+.exp-menu[hidden]{display:none}
+.exp-h{font-size:.75rem;color:var(--muted);padding:4px 8px 6px}
+.exp-menu button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;border:0;border-radius:7px;background:none;padding:7px 9px;color:var(--ink)}
+.exp-menu button:hover,.exp-menu button:focus-visible{background:#eef5f7}
+.exp-menu button:disabled{opacity:.5;cursor:not-allowed}
+.exp-menu b{font-size:.875rem}
+.exp-menu small{font-size:.75rem;color:var(--muted);line-height:1.35}
 .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
 .metric{background:#fff;padding:12px 15px;min-width:0;text-align:left}
 .metric-label{font-size:.75rem;letter-spacing:.8px;font-weight:600;text-transform:uppercase;color:var(--muted)}
@@ -383,12 +409,23 @@ abbr[title]{text-decoration:underline dotted #8aa1ae;text-underline-offset:2px;c
 .dr-photo figcaption{position:absolute;right:6px;bottom:6px;background:#102d41cc;color:#fff;font-size:.75rem;padding:1px 6px;border-radius:4px}
 .dr-nophoto{height:120px;border-radius:8px;border:1px dashed #cbd8e1;background:#f6f9fb;color:var(--ico);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:.75rem}
 .dr-nophoto span{color:var(--muted)}
+/* v0.7.0 : bascule de la photo (Wikipédia / MTMD) sous la photo d'un pont lié à un article */
+.dr-phwrap{display:flex;flex-direction:column;gap:5px}
+.dr-phsw{display:flex;gap:4px;align-self:flex-start}
+.dr-phsw button{border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font-size:.75rem;font-weight:600;padding:3px 9px}
+.dr-phsw button[aria-pressed=true]{background:var(--navy);border-color:var(--navy);color:#fff}
 .dr-links{display:flex;flex-wrap:wrap;gap:5px}
 .dr-links a,.dr-links button{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:.75rem;font-weight:600;color:var(--teal);text-decoration:none;background:#fff;line-height:1.4}
 .dr-links a:hover,.dr-links button:hover{background:#eef5f7}
 .dr-links button{color:var(--ink)}
 .dr-links .ld-btn{background:var(--navy);border-color:var(--navy);color:#fff}
 .dr-links .ld-btn:hover{background:#1c4561}
+/* v0.7.0 : lien Wikipédia mis en valeur (orange, texte blanc : contraste 5,2:1) ; fenêtres prototypes en tirets */
+.dr-links .dr-wiki a{background:#c2410c;border-color:#c2410c;color:#fff}
+.dr-links .dr-wiki a:hover{background:#9a3412;border-color:#9a3412}
+.dr-links .ld-btn.proto{background:#fff;color:var(--navy);border:1px dashed var(--navy)}
+.dr-links .ld-btn.proto:hover{background:#eef5f7}
+.dr-links .ld-btn.proto small{font-weight:600;font-size:.625rem;text-transform:uppercase;letter-spacing:.04em;color:#566e7c}
 .dr-sec{break-inside:avoid;margin-bottom:14px}
 .dr-sec h3{margin:0 0 6px;font-size:.75rem;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:650;border-bottom:1px solid var(--line);padding-bottom:3px}
 .dr-grid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:0;font-size:.8rem;line-height:1.4}
@@ -426,12 +463,8 @@ abbr[title]{text-decoration:underline dotted #8aa1ae;text-underline-offset:2px;c
 /* Numéros au-dessus des points (zoom ≥ 12 depuis v0.6.4 ; étiquettes qui se chevauchent omises) */
 .num-lbl{background:none;border:0}
 .num-lbl span{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font:600 12px/1 "Segoe UI",Arial,sans-serif;color:#102d41;background:#ffffffd9;border-radius:3px;padding:1px 3px;box-shadow:0 0 0 1px #102d4122}
-/* v0.6.4 : boutons de carte en haut à gauche (zoom, Québec, couches), chacun dans sa case, sans trait de séparation
-   (le trait gris de Leaflet sous « + » se lisait comme un soulignement) */
-.leaflet-touch .leaflet-bar.leaflet-control-zoom,.leaflet-touch .leaflet-bar.home-ctl{border:0;box-shadow:none;background:none;display:flex;flex-direction:column;gap:4px}
-.leaflet-touch .leaflet-control-zoom a,.leaflet-touch .home-ctl a{width:36px;height:36px;display:grid;place-items:center;padding:0;border:2px solid #0000002e!important;border-radius:8px!important;background:#fff;background-clip:padding-box;color:var(--ink);text-decoration:none!important;font:400 22px/1 "Segoe UI",Arial,sans-serif}
-.leaflet-touch .leaflet-control-zoom a:hover,.leaflet-touch .home-ctl a:hover,.lc-btn:hover{background:#eef5f7;color:var(--teal)}
-.leaflet-touch .leaflet-control-zoom a.leaflet-disabled{color:#b4c2cc;background:#f6f9fb}
+/* v0.7.0 : boutons « + », « − » et Québec retirés (demande) : il reste « Couches » et « Masquer » en haut à gauche */
+.lc-btn:hover{background:#eef5f7;color:var(--teal)}
 .leaflet-top.leaflet-left{z-index:1001}  /* panneau des couches ouvert au-dessus de la légende (en bas à gauche) */
 .leaflet-top.leaflet-left .leaflet-control{margin-top:6px}
 .leaflet-top.leaflet-left .leaflet-control:first-child{margin-top:10px}
@@ -723,9 +756,12 @@ table.list tbody tr:hover{background:#eef5f7}
       <details class="input-group" open>
         <summary><span class="group-title">Recherche</span></summary>
         <div class="group-body">
-          <label class="field"><span>Texte libre</span>
-            <input type="search" id="q" aria-label="Recherche" placeholder="Rechercher (nom, route, obstacle, municipalité)…" autocomplete="off">
+          <!-- v0.7.0 : étiquettes de recherche (plusieurs structures à la fois : n° ou mots, reliés par « ou ») -->
+          <label class="field"><span>Texte libre ou n° de structure</span>
+            <span class="tagbox" id="tagbox"><span class="tags" id="tags" role="list" aria-label="Étiquettes de recherche"></span>
+            <input type="search" id="q" aria-label="Recherche" aria-describedby="q-hint" placeholder="Nom, route, obstacle, municipalité, n°…" autocomplete="off"></span>
           </label>
+          <p class="hint" id="q-hint">Entrée ou virgule : le texte devient une étiquette. Plusieurs étiquettes = l’une <b>ou</b> l’autre. Collez une liste de n° (07724, 04296…) pour voir ces structures seulement, tous types confondus.</p>
         </div>
       </details>
 
@@ -853,8 +889,17 @@ table.list tbody tr:hover{background:#eef5f7}
       <button type="button" data-view="stats"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 20h16M7 16v-5M12 16V6M17 16v-8"/></svg><span class="tab-l">Statistiques</span><span class="tab-c">Stats</span></button>
       <button type="button" data-view="defile" title="Les structures filtrées une à une, en grand, photos d’abord (tirage au hasard)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="15.5" cy="9" r="1.4" fill="currentColor"/></svg>Galerie</button>
       <button type="button" class="news-btn" id="news-btn" data-view="news" title="Changements entre les mises à jour et inspections récentes"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="news-lbl"><span class="tab-l">Quoi de neuf</span><span class="tab-c">Nouveau</span></span><span class="news-n" id="news-n" hidden></span></button>
-      <button type="button" data-view="remarq" title="Ponts remarquables du Canada (Wikipédia), hors inventaire du MTMD"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z" fill="currentColor"/></svg><span class="tab-l">Ponts remarquables</span><span class="tab-c">Remarquables</span></button>
+      <button type="button" data-view="remarq" title="Ponts remarquables : ouvrages du MTMD qui ont un article Wikipédia, et ponts du Canada hors inventaire"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z" fill="currentColor"/></svg><span class="tab-l">Ponts remarquables</span><span class="tab-c">Remarquables</span></button>
     </nav>
+    <!-- v0.7.0 : exports regroupés (CSV, KMZ pour Google Earth), visibles depuis toutes les vues -->
+    <div class="exp" id="exp">
+      <button type="button" class="exp-btn" id="exp-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="exp-menu" title="Télécharger les structures filtrées"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14"/></svg>Exporter</button>
+      <div class="exp-menu" id="exp-menu" role="menu" hidden>
+        <div class="exp-h" id="exp-h"></div>
+        <button type="button" role="menuitem" data-exp="csv"><b>CSV</b><small>Tableur (Excel) : une ligne par structure, séparateur « ; »</small></button>
+        <button type="button" role="menuitem" data-exp="kmz"><b>KMZ</b><small>Google Earth : points colorés selon l’ICG, fiche et photo au clic</small></button>
+      </div>
+    </div>
     <section class="metrics kpi-bar" aria-label="Indicateurs">
       <div class="metric"><div class="metric-label">Structures</div><div class="metric-value" id="m-count">—</div></div>
       <div class="metric"><div class="metric-label">ICG 1–2</div><div class="metric-value" id="m-icg-bad">—</div></div>
@@ -891,7 +936,6 @@ table.list tbody tr:hover{background:#eef5f7}
     <div class="listview view" id="view-liste" hidden>
       <div class="list-bar">
         <span class="cnt" id="list-count" role="status"></span>
-        <button type="button" id="export-csv">Exporter CSV</button>
       </div>
       <div class="tablewrap">
         <table class="tbl list" id="list-table">
@@ -950,7 +994,7 @@ table.list tbody tr:hover{background:#eef5f7}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="data/structures.js"></script>
 <script src="data/details.js"></script>
-<script>window.PQ_META={"version": "0.6.9", "date": "2026-11-04", "author": "Anthony Chéruel"};</script>
+<script>window.PQ_META={"version": "0.7.0", "date": "2026-11-05", "author": "Anthony Chéruel"};</script>
 <script>
 (function(){
   'use strict';
@@ -1026,8 +1070,10 @@ table.list tbody tr:hover{background:#eef5f7}
       },
       setLatLng: function(ll){ this._w = null; return cmSetLatLng.call(this, ll); }
     });
+    // v0.7.0 : sans boutons de zoom (molette, pincement, double-clic, touches + et −) ; vue de départ resserrée sur
+    // le sud du Québec (cadre QC_VUE, appliqué au démarrage selon la taille de la carte)
     map = L.map('map', {
-      preferCanvas: true, center: [47.0, -71.5], zoom: 6, minZoom: 4, maxZoom: 18,
+      preferCanvas: true, center: [47.2, -69.8], zoom: 7, minZoom: 4, maxZoom: 18, zoomControl: false,
       zoomSnap: 0, zoomDelta: 0.5, scrollWheelZoom: false, smoothWheel: true
     });
     // Tuiles Esri : aucune clé ni en-tête Referer requis (OSM et CARTO refusent les pages file://)
@@ -1367,7 +1413,8 @@ table.list tbody tr:hover{background:#eef5f7}
   try { if (MODES[localStorage.getItem(MODE_KEY)]) colorMode = localStorage.getItem(MODE_KEY); } catch (e) { /* stockage indisponible */ }
 
   // ---------- Filtres : valeurs par défaut, état, hash ----------
-  var DEFAULTS = { q: '', famille: 'pont', types: [], region: '', reseau: '', ob: '', icg: '', ias: '', amin: '', amax: '', lmin: '', h: '', lp: false, hp: false, vi: false, ch: '' };
+  // v0.7.0 : « tags » = étiquettes de recherche (n° de structure ou mots), reliées par « ou »
+  var DEFAULTS = { q: '', tags: [], famille: 'pont', types: [], region: '', reseau: '', ob: '', icg: '', ias: '', amin: '', amax: '', lmin: '', h: '', lp: false, hp: false, vi: false, ch: '' };
   var CH_VALUES = ['c30', 'c90', 'c365', 'i30', 'i90', 'i365'];
   // pendingSel : fiche demandée par le lien (ville) en attente de chargement, gardée dans l'adresse (audit v0.5.5 n° 6)
   var state = {}, view = 'carte', selNum = null, pendingSel = null, selWp = null, wpHash = null;   // selWp : pont remarquable ouvert (v0.6.4)
@@ -1378,14 +1425,14 @@ table.list tbody tr:hover{background:#eef5f7}
   REGIONS.forEach(function(r){ var o = document.createElement('option'); o.value = r; o.textContent = r; rsel.appendChild(o); });
   OBST_ORDER.forEach(function(r){ var o = document.createElement('option'); o.value = r; o.textContent = r; $('#obst').appendChild(o); });
 
-  var HASH_KEYS = { q: 'q', famille: 'f', types: 't', region: 'r', reseau: 'n', ob: 'o', icg: 'icg', ias: 'ias', amin: 'a0', amax: 'a1', lmin: 'l', h: 'h', lp: 'p', hp: 'hp', vi: 'vi', ch: 'ch' };
+  var HASH_KEYS = { q: 'q', tags: 'tg', famille: 'f', types: 't', region: 'r', reseau: 'n', ob: 'o', icg: 'icg', ias: 'ias', amin: 'a0', amax: 'a1', lmin: 'l', h: 'h', lp: 'p', hp: 'hp', vi: 'vi', ch: 'ch' };
   var VIEWS = ['carte', 'stats', 'liste', 'defile', 'news', 'remarq'];          // v0.6.7 : « news » = Quoi de neuf
   function numOk(v){ return v != null && v !== '' && isFinite(parseFloat(v)); }
   function stateToHash(){
     var p = new URLSearchParams();
     for (var k in HASH_KEYS) {
       var v = state[k];
-      if (Array.isArray(v)) { if (v.length) p.set(HASH_KEYS[k], v.join('.')); continue; }
+      if (Array.isArray(v)) { if (v.length) p.set(HASH_KEYS[k], v.join(k === 'tags' ? '|' : '.')); continue; }   // étiquettes : « | » (un mot peut porter un point)
       if (v === DEFAULTS[k]) continue;
       p.set(HASH_KEYS[k], typeof v === 'boolean' ? '1' : v);
     }
@@ -1403,6 +1450,7 @@ table.list tbody tr:hover{background:#eef5f7}
     var p = new URLSearchParams(location.hash.replace(/^#/, ''));
     var get = function(k){ return p.get(HASH_KEYS[k]); };
     if (get('q') != null) state.q = get('q');
+    if (get('tags')) state.tags = get('tags').split('|').map(function(t){ return t.trim(); }).filter(Boolean).slice(0, TAG_MAX);
     if (['pont', 'ponceau', 'mur', 'tunnel', 'tous'].indexOf(get('famille')) >= 0) state.famille = get('famille');
     if (get('types')) state.types = get('types').split('.').filter(function(c){ return D.types[c]; });
     if (get('region') != null && REGIONS.indexOf(get('region')) >= 0) state.region = get('region');
@@ -1424,6 +1472,7 @@ table.list tbody tr:hover{background:#eef5f7}
   }
   function stateToUI(){
     $('#q').value = state.q;
+    renderTags();
     setFamilleUI(state.famille);
     buildTypeOptions();
     $('#region').value = state.region;
@@ -1487,9 +1536,51 @@ table.list tbody tr:hover{background:#eef5f7}
     });
   }
 
+  // ---------- Étiquettes de recherche (v0.7.0) : plusieurs structures à la fois ----------
+  // Une étiquette est un n° de structure (« 4296 », « 04296 », « P-04296 », « 09788S ») ou un mot (« Papineau »). Les
+  // étiquettes se combinent par « ou ». Un n° montre sa structure quels que soient les autres filtres (type, famille,
+  // inventaire public…) : la demande porte sur ces ouvrages-là. Un mot, lui, respecte les autres filtres.
+  var TAG_MAX = 200;
+  function tagNum(t){
+    var m = /^(?:P\s*-?\s*)?(\d{1,5})([A-Z]{0,2}\d?)$/.exec(String(t).trim().toUpperCase());
+    return m ? ('0000' + m[1]).slice(-5) + m[2] : null;
+  }
+  // Texte collé ou tapé → étiquettes : coupure aux virgules, points-virgules, tabulations et retours de ligne ; un
+  // morceau fait seulement de n° séparés par des espaces (« 04296 07724 ») donne une étiquette par n°
+  function parseTags(s){
+    var out = [];
+    String(s).split(/[,;\t\r\n]+/).forEach(function(x){
+      x = x.trim();
+      if (!x) return;
+      var parts = x.split(/\s+/);
+      if (parts.length > 1 && parts.every(function(w){ return tagNum(w); })) out.push.apply(out, parts);
+      else out.push(x);
+    });
+    return out;
+  }
+  function addTags(list){
+    var have = {};
+    state.tags.forEach(function(t){ have[tagNum(t) || norm(t)] = 1; });
+    list.forEach(function(t){
+      var k = tagNum(t) || norm(t);
+      if (have[k] || state.tags.length >= TAG_MAX) return;
+      have[k] = 1; state.tags.push(tagNum(t) || t);
+    });
+  }
+  function renderTags(){
+    $('#tags').innerHTML = state.tags.map(function(t, i){
+      var n = tagNum(t), o = n && byNum[n], cls = n ? (o ? '' : ' miss') : ' txt';
+      var tip = n ? (o ? (o.nom || o.tl || 'Structure') + (o.fam && FAM_LABEL[o.fam] ? ' · ' + FAM_LABEL[o.fam] : '') : 'Aucune structure de ce n° dans l’inventaire') : 'Mot cherché : « ' + t + ' »';
+      return '<span class="tag' + cls + '" role="listitem" title="' + esc(tip) + '"><b>' + esc(n || t) + (n && !o ? ' ?' : '') + '</b>' +
+        '<button type="button" data-tag="' + i + '" aria-label="Retirer l’étiquette ' + esc(n || t) + '">×</button></span>';
+    }).join('');
+  }
+
   // ---------- Filtrage ----------
   var RESEAU_LABEL = { superieur: 'Supérieur', municipal: 'Municipal' };
   function matches(o, c){
+    // v0.7.0 : étiquettes. N° demandé : toujours montré ; seulement des n° : rien d'autre
+    if (c.tn) { if (!o.src && c.tn[o.num]) return true; if (!c.tt) return false; }
     if (o.src) { if (!c.vi || o.dup) return false; }           // ouvrage d'une ville (doublon du MTMD : jamais)
     else if (!c.hp && o.pub !== 1) return false;
     if (c.chSet && !c.chSet[o.key]) return false;
@@ -1507,6 +1598,7 @@ table.list tbody tr:hover{background:#eef5f7}
     if (c.hmax != null && !(o.hmin != null && o.hmin < c.hmax)) return false;
     if (c.lp && o.limP !== 1) return false;
     if (c.qn && o.s.indexOf(c.qn) < 0) return false;
+    if (c.tt && !c.tt.some(function(t){ return o.s.indexOf(t) >= 0; })) return false;    // v0.7.0 : un des mots
     return true;
   }
 
@@ -1654,6 +1746,9 @@ table.list tbody tr:hover{background:#eef5f7}
   // Numéros des structures au-dessus des points (partie visible seulement). v0.6.4 : dès le zoom 12 (14 avant) ;
   // une étiquette qui en chevaucherait une autre est omise (grille de cases de 8 px), ce qui garde le zoom 12 lisible
   var labelLayer = window.L ? L.layerGroup() : null, LABEL_ZOOM = 12, LABEL_MAX = 500;
+  // v0.7.0 : étiquette de carte d'une structure ; « P- » pour les ponts du MTMD seulement (ni ponceau, ni mur, ni tunnel,
+  // ni ouvrage d'une ville). La fiche, la liste et l'export gardent le numéro tel quel.
+  function numLbl(o){ return (!o.src && o.fam === 'pont' ? 'P-' : '') + o.num; }
   function updateLabels(){
     if (!map) return;
     labelLayer.clearLayers();
@@ -1663,14 +1758,16 @@ table.list tbody tr:hover{background:#eef5f7}
     for (var i = 0; i < list.length && n < LABEL_MAX; i++) {
       var o = list[i];
       if ((i && o === sel) || !b.contains([o.lat, o.lon])) continue;
-      var pt = map.latLngToContainerPoint([o.lat, o.lon]), w = String(o.num).length * 7 + 8, top = pt.y - radius * styleFor(o).rmul - 18;
+      // v0.7.0 : « P- » devant le n° des ponts du MTMD (sur la carte seulement), pour ne pas le confondre avec un DJMA
+      var txt = numLbl(o);
+      var pt = map.latLngToContainerPoint([o.lat, o.lon]), w = txt.length * 7 + 8, top = pt.y - radius * styleFor(o).rmul - 18;
       var x0 = Math.floor((pt.x - w / 2) / G), x1 = Math.floor((pt.x + w / 2) / G), y0 = Math.floor(top / G), y1 = Math.floor((top + 15) / G), free = true, gx, gy;
       for (gx = x0; gx <= x1 && free; gx++) for (gy = y0; gy <= y1; gy++) if (taken[gx + ',' + gy]) { free = false; break; }
       if (!free) continue;
       for (gx = x0; gx <= x1; gx++) for (gy = y0; gy <= y1; gy++) taken[gx + ',' + gy] = 1;
       n++;
       L.marker([o.lat, o.lon], { interactive: false, keyboard: false, pane: 'labels',
-        icon: L.divIcon({ className: 'num-lbl', html: '<span>' + esc(o.num) + '</span>', iconSize: null, iconAnchor: [0, radius * styleFor(o).rmul + 3] }) }).addTo(labelLayer);
+        icon: L.divIcon({ className: 'num-lbl', html: '<span>' + esc(txt) + '</span>', iconSize: null, iconAnchor: [0, radius * styleFor(o).rmul + 3] }) }).addTo(labelLayer);
     }
     if (!map.hasLayer(labelLayer)) labelLayer.addTo(map);
   }
@@ -2193,9 +2290,17 @@ table.list tbody tr:hover{background:#eef5f7}
     var C = couche('wikiponts'), x = C && !o.src && C.mtmd[o.num];
     return x ? wpLink(x) : '';
   }
+  // v0.7.0 : photo libre de l'article Wikipédia d'un ouvrage du MTMD (data/couche-wikiponts.js, champ « img »)
+  function wikiImg(o){
+    var C = couche('wikiponts'), x = C && !o.src && C.mtmd[o.num];
+    return x && x.img && x.img.src ? x.img : null;
+  }
+  function wpImgCap(im){ return 'Photo : ' + esc(im.auteur || 'auteur inconnu') + (im.licence ? ' · ' + esc(im.licence) : '') + ' · Wikimedia Commons'; }
   function refreshWikiLinks(){
     var o = selNum != null && byNum[selNum], el = $('#dr-wiki');
     if (o && el) el.innerHTML = wikiLinksHtml(o);
+    // couche arrivée après l'ouverture de la fiche (lien direct #s=…) : la photo de l'article s'ajoute
+    if (o && el && wikiImg(o) && !drawer.querySelector('.dr-phwrap')) { var sc = drawer.querySelector('.dr-body'), t = sc ? sc.scrollTop : 0; select(o, { noHash: true, focus: false }); if (sc = drawer.querySelector('.dr-body')) sc.scrollTop = t; }
   }
   // Vue « Ponts remarquables » : liste à part, groupée par province (le Québec hors inventaire en tête)
   var wpProvOrder = function(a){ return a === 'Québec' ? '' : a || '~'; };
@@ -2210,11 +2315,21 @@ table.list tbody tr:hover{background:#eef5f7}
     var groups = {};
     C.ponts.forEach(function(p){ (groups[p.prov || 'Autre'] = groups[p.prov || 'Autre'] || []).push(p); });
     var provs = Object.keys(groups).sort(function(a, b){ return collator.compare(wpProvOrder(a), wpProvOrder(b)); });
-    var nMt = Object.keys(C.mtmd).length;
-    el.innerHTML = '<div class="rq-head"><h2>' + starSvg(18) + 'Ponts remarquables du Canada <small>' + nf.format(C.ponts.length) + ' ouvrages hors inventaire du MTMD</small></h2>' +
-      '<p>Ponts d’intérêt historique ou majeurs de la <a href="' + esc(C.source) + '" target="_blank" rel="noopener">liste des ponts du Canada</a> (Wikipédia), complétés par Wikidata. Ils sont affichés en étoiles sur la carte, ' +
-      'mais <b>ne comptent ni dans les filtres ni dans les statistiques</b> (case « ponts remarquables » du panneau des filtres). Sans photo libre, la vignette est une vue aérienne. ' + nf.format(nMt) + ' ouvrages du MTMD reliés à un article ont un lien Wikipédia dans leur fiche. Mise à jour : ' + esc(C.generated) + '.</p>' +
-      '<nav class="rq-nav" aria-label="Provinces">' + provs.map(function(pv, i){ return '<a href="#rq-' + i + '">' + esc(pv) + ' <small>' + groups[pv].length + '</small></a>'; }).join('') + '</nav></div>' +
+    // v0.7.0 : ouvrages de l'inventaire du MTMD qui ont un article Wikipédia (Papineau-Leblanc, Pierre-Laporte…) : une
+    // carte par article (ponts jumeaux regroupés), photo de l'article ; clic = fiche du MTMD
+    var mtCards = wpMtmdCards(C);
+    el.innerHTML = '<div class="rq-head"><h2>' + starSvg(18) + 'Ponts remarquables <small>' + nf.format(mtCards.length) + ' ouvrages du MTMD · ' + nf.format(C.ponts.length) + ' hors inventaire</small></h2>' +
+      '<p>Ponts d’intérêt historique ou majeurs de la <a href="' + esc(C.source) + '" target="_blank" rel="noopener">liste des ponts du Canada</a> (Wikipédia), complétés par Wikidata. ' +
+      'Les <b>ouvrages du MTMD</b> qui ont un article Wikipédia viennent en tête : leur fiche est celle du MTMD, avec la photo de l’article. ' +
+      'Les autres, <b>hors inventaire</b>, sont des étoiles sur la carte, qui <b>ne comptent ni dans les filtres ni dans les statistiques</b> (case « ponts remarquables » du panneau des filtres). Sans photo libre, la vignette est une vue aérienne. Mise à jour : ' + esc(C.generated) + '.</p>' +
+      '<nav class="rq-nav" aria-label="Provinces">' + (mtCards.length ? '<a href="#rq-mtmd">Québec, inventaire du MTMD <small>' + mtCards.length + '</small></a>' : '') +
+      provs.map(function(pv, i){ return '<a href="#rq-' + i + '">' + esc(pv) + (pv === 'Québec' ? ', hors inventaire' : '') + ' <small>' + groups[pv].length + '</small></a>'; }).join('') + '</nav></div>' +
+      (mtCards.length ? '<section class="rq-sec" id="rq-mtmd"><h3>Québec <small>inventaire du MTMD · fiche du MTMD et photo de Wikipédia</small></h3><div class="rq-grid">' +
+        mtCards.map(function(c){
+          return '<button type="button" class="rq-card" data-num="' + esc(c.o.num) + '">' +
+            (c.src ? '<img src="' + esc(c.src) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="rq-noimg">' + icon(c.o.tc, 30) + '</span>') +
+            '<span class="rq-t"><b>' + esc(c.nom) + '</b><small>' + esc(['N° ' + c.nums.join(', '), c.o.annee, fmtM(c.o.long)].filter(Boolean).join(' · ')) + '</small></span></button>';
+        }).join('') + '</div></section>' : '') +
       provs.map(function(pv, i){
         return '<section class="rq-sec" id="rq-' + i + '"><h3>' + esc(pv) + (pv === 'Québec' ? ' <small>hors inventaire du MTMD</small>' : '') + '</h3><div class="rq-grid">' +
           groups[pv].map(function(p){
@@ -2225,10 +2340,26 @@ table.list tbody tr:hover{background:#eef5f7}
       }).join('');
     el.dataset.ok = '1';
   }
+  // v0.7.0 : cartes des ouvrages du MTMD liés à un article (un par article ; nom de l'article, à défaut celui du MTMD)
+  function wpMtmdCards(C){
+    var parQ = {}, out = [];
+    Object.keys(C.mtmd).sort(collator.compare).forEach(function(num){
+      var x = C.mtmd[num], o = byNum[num];
+      if (!o) return;
+      var c = parQ[x.q];
+      if (c) { c.nums.push(num); return; }
+      c = parQ[x.q] = { o: o, x: x, nums: [num], nom: (x.fr || o.nom || x.en || '').replace(/\s*\(.*?\)\s*$/, ''),
+        src: x.img ? x.img.src : photoUrl(o) };
+      out.push(c);
+    });
+    return out.sort(function(a, b){ return collator.compare(a.nom, b.nom); });
+  }
   $('#view-remarq').addEventListener('click', function(e){
     var b = e.target.closest('.rq-card');
     if (!b || !map) return;
     showView('carte');
+    var num = b.getAttribute('data-num');
+    if (num != null) { if (byNum[num]) select(byNum[num], { center: true }); return; }
     openWpById(b.getAttribute('data-id'));
   });
   $('#view-remarq').addEventListener('error', function(e){ if (e.target.tagName === 'IMG') e.target.replaceWith(document.createRange().createContextualFragment('<span class="rq-noimg">' + starSvg(28) + '</span>')); }, true);
@@ -2609,17 +2740,31 @@ table.list tbody tr:hover{background:#eef5f7}
       (badges ? '<div class="dr-badges">' + badges + '</div>' : '') +
       '<button type="button" class="dr-close" data-act="close" aria-label="Fermer la fiche" title="Fermer (Échap)">×</button></div>' +
       '<div class="dr-body"><div class="dr-top"><div class="dr-side">';
-    if (photo) {
+    // v0.7.0 : pont lié à un article Wikipédia qui a une photo libre : photo de l'article d'abord (souvent plus belle),
+    // bascule « Wikipédia / MTMD » sous la photo
+    var wimg = wikiImg(o);
+    if (wimg) {
+      h += '<div class="dr-phwrap" data-mtmd="' + esc(photo || '') + '" data-wp="' + esc(wimg.src) + '" data-wpcap="' + esc(wpImgCap(wimg)) + '" data-wphref="' + esc(wimg.page || wimg.src) + '">' +
+        '<a class="dr-photo" href="' + esc(wimg.page || wimg.src) + '" target="_blank" rel="noopener" aria-label="Ouvrir la photo en grand">' +
+        '<img src="' + esc(wimg.src) + '" alt="Photo de la structure ' + esc(o.num) + '" referrerpolicy="no-referrer"><figcaption>' + wpImgCap(wimg) + '</figcaption></a>' +
+        (photo ? '<div class="dr-phsw" role="group" aria-label="Source de la photo"><button type="button" data-act="ph-wp" aria-pressed="true">Wikipédia</button><button type="button" data-act="ph-mtmd" aria-pressed="false">MTMD</button></div>' : '') + '</div>';
+    } else if (photo) {
       h += '<a class="dr-photo" href="' + esc(photo) + '" target="_blank" rel="noopener" aria-label="Ouvrir la photo en grand">' +
         '<img src="' + esc(photo) + '" alt="Photo de la structure ' + esc(o.num) + '" referrerpolicy="no-referrer"><figcaption>Photo : MTMD</figcaption></a>';
     } else {
       h += '<div class="dr-nophoto">' + icon(o.tc, 30) + '<span>Pas de photo</span></div>';
     }
-    h += '<div class="dr-links">' + links.join('') + '<span class="dr-wiki" id="dr-wiki">' + wikiLinksHtml(o) + '</span>' + (o.lat != null ? '<button type="button" data-act="center">Centrer la carte</button><button type="button" class="ld-btn" data-act="lidar" title="Profils en long et en travers, hauteur sous l’ouvrage, relief ombré local (LiDAR 1 m de RNCan, calcul de quelques secondes)">Profil LiDAR</button>' +
+    // v0.7.0 : « Profil LiDAR » absent pour les murs, tunnels et ponceaux (demande) ; fenêtres prototypes « Vue 3D »
+    // (js/vue3d.js) et « Climat futur » (js/climat.js), à valider avant intégration
+    var lidarOk = ['mur', 'tunnel', 'ponceau'].indexOf(o.fam) < 0;
+    h += '<div class="dr-links">' + links.join('') + '<span class="dr-wiki" id="dr-wiki">' + wikiLinksHtml(o) + '</span>' + (o.lat != null ? '<button type="button" data-act="center">Centrer la carte</button>' +
+      (lidarOk ? '<button type="button" class="ld-btn" data-act="lidar" title="Profils en long et en travers, hauteur sous l’ouvrage, relief ombré local (LiDAR 1 m de RNCan, calcul de quelques secondes)">Profil LiDAR</button>' : '') +
       (o.obst === "Cours d'eau" ? '<button type="button" class="ld-btn" data-act="hydro" title="Bassin versant, zone inondable, niveaux et débits à la station la plus proche">Cours d’eau</button>' : '') +
       // v0.6.7 : fenêtre « Environnement » (prototype « Zones sensibles » intégré), pour tous les ouvrages
       '<button type="button" class="ld-btn" data-act="environnement" title="Aires protégées, habitats fauniques et floristiques, espèces en situation précaire, milieux humides, zones inondables et espèces envahissantes autour de l’ouvrage (1, 2 ou 5 km)">Environnement</button>' +
-      '<button type="button" class="ld-btn" data-act="sismique" title="Spectres d’aléa du CNBC 2020/2025 (classes de site A à E, probabilités 2, 5 et 10 % en 50 ans)">Aléa sismique</button>' : '') + '</div>';
+      '<button type="button" class="ld-btn" data-act="sismique" title="Spectres d’aléa du CNBC 2020/2025 (classes de site A à E, probabilités 2, 5 et 10 % en 50 ans)">Aléa sismique</button>' +
+      '<button type="button" class="ld-btn proto" data-act="vue3d" title="Prototype : bloc 3D d’environ 1 km² autour de l’ouvrage (LiDAR de RNCan, imagerie satellite drapée), à faire pivoter à la souris">Vue 3D <small>proto</small></button>' +
+      '<button type="button" class="ld-btn proto" data-act="climat" title="Prototype : indices climatiques passés et futurs à l’ouvrage (scénarios CMIP6 réduits d’ECCC, cellule de 10 km), sans note de risque">Climat futur <small>proto</small></button>' : '') + '</div>';
     h += '</div>';
     // Photo en grand à gauche, identification à droite ; le reste sur deux colonnes en dessous
     function secHtml(s){ return s.rows.length ? '<section class="dr-sec"><h3>' + esc(s.name) + '</h3><dl class="dr-grid">' + s.rows.join('') + '</dl></section>' : ''; }
@@ -2709,8 +2854,15 @@ table.list tbody tr:hover{background:#eef5f7}
     else if (act === 'center' && selWp != null && wpById(selWp)) centerOn(wpById(selWp));
     else if (act === 'center' && o) centerOn(o);
     else if (act === 'lidar' && o) openLidar(o);
-    else if ((act === 'hydro' || act === 'sismique' || act === 'environnement') && o) openAux(act, o);
+    else if ((act === 'hydro' || act === 'sismique' || act === 'environnement' || act === 'vue3d' || act === 'climat') && o) openAux(act, o);   // v0.7.0 : prototypes
     else if ((act === 'mtmd' || act === 'ville') && byNum[b.getAttribute('data-num')]) select(byNum[b.getAttribute('data-num')], { center: true });
+    else if (act === 'ph-wp' || act === 'ph-mtmd') {                 // v0.7.0 : bascule de la photo Wikipédia / MTMD
+      var w = b.closest('.dr-phwrap'), wp = act === 'ph-wp', src = w.getAttribute(wp ? 'data-wp' : 'data-mtmd'), a = w.querySelector('.dr-photo');
+      a.href = wp ? w.getAttribute('data-wphref') : src;
+      a.querySelector('img').src = src;
+      a.querySelector('figcaption').innerHTML = wp ? w.getAttribute('data-wpcap') : 'Photo : MTMD';
+      w.querySelectorAll('.dr-phsw button').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
+    }
     else if (act === 'geo' && o) {
       b.disabled = true; b.textContent = 'Chargement…';
       loadScript('data/couche-geotech.js').then(refreshExtra, function(){ b.textContent = 'Couche indisponible (python -m etl.geotech)'; });
@@ -2909,13 +3061,16 @@ table.list tbody tr:hover{background:#eef5f7}
   }
 
   // ---------- Modules à la demande : js/hydro.js (« Cours d'eau au pont »), js/sismique.js (« Aléa sismique »),
-  // js/environnement.js (« Environnement », v0.6.7) ----------
+  // js/environnement.js (« Environnement », v0.6.7), prototypes js/vue3d.js et js/climat.js (v0.7.0) ----------
   // Contrat : le module s'enregistre dans window.QA_MOD[clé] = { render: function(o, body, ctx){ … } } et reçoit
   // ctx = { alive() : faux si la fenêtre a été fermée ou rouverte pour un autre ouvrage, onClose(fn), setSub(texte) }.
   var AUX = { hydro: { badge: 'HYDRO', title: 'Cours d’eau au pont', wait: 'Cours d’eau, bassin, zone inondable et station la plus proche…' },
     sismique: { badge: 'SÉISME', title: 'Aléa sismique', wait: 'Valeurs du CNBC à l’ouvrage…' },
     // v0.6.7 : js/environnement.js (zones sensibles autour de l'ouvrage)
-    environnement: { badge: 'ENV', title: 'Environnement', wait: 'Aires protégées, habitats, espèces, milieux humides et zones inondables autour de l’ouvrage…' } };
+    environnement: { badge: 'ENV', title: 'Environnement', wait: 'Aires protégées, habitats, espèces, milieux humides et zones inondables autour de l’ouvrage…' },
+    // v0.7.0 : prototypes à valider (js/vue3d.js, js/climat.js)
+    vue3d: { badge: '3D', title: 'Vue 3D du site (prototype)', wait: 'Relief LiDAR et imagerie autour de l’ouvrage…' },
+    climat: { badge: 'CLIMAT', title: 'Climat futur (prototype)', wait: 'Scénarios climatiques d’ECCC à l’ouvrage…' } };
   var axRun = 0, axClose = [];
   function openAux(kind, o){
     var A = AUX[kind], dlg = $('#aux-dialog'), body = dlg.querySelector('.ax-body'), run = ++axRun;
@@ -3091,7 +3246,10 @@ table.list tbody tr:hover{background:#eef5f7}
   function criteria(){
     var types = null;
     if (state.types.length) { types = {}; state.types.forEach(function(c){ types[c] = 1; }); }
+    var tn = null, tt = [];                     // v0.7.0 : étiquettes (n° → tn, mots normalisés → tt)
+    state.tags.forEach(function(t){ var n = tagNum(t); if (n) (tn = tn || {})[n] = 1; else tt.push(norm(t)); });
     return {
+      tn: tn, tt: tt.length ? tt : null,
       hp: state.hp, vi: state.vi, chSet: suiviSet(state.ch), famille: state.famille, types: types, region: state.region, reseau: state.reseau, ob: state.ob, icg: state.icg, ias: state.ias,
       lp: state.lp, qn: norm(state.q.trim()),
       amin: numOk(state.amin) ? parseFloat(state.amin) : null,
@@ -3108,7 +3266,7 @@ table.list tbody tr:hover{background:#eef5f7}
       // compteur des types précis : tous les autres filtres appliqués, sauf le choix de types lui-même
       var ok = o.lat != null && o.lon != null && matches(o, c0);
       if (ok && o.tc != null) tcn[o.tc] = (tcn[o.tc] || 0) + 1;
-      if (ok && c.types && !c.types[o.tc]) ok = false;
+      if (ok && c.types && !c.types[o.tc] && !(c.tn && !o.src && c.tn[o.num])) ok = false;
       if (ok) vis.push(o);
       if (!ok && o.on) { if (group) group.removeLayer(o.m); o.on = false; }
     }
@@ -3620,7 +3778,6 @@ table.list tbody tr:hover{background:#eef5f7}
     var more = $('#list-more');
     more.hidden = shown >= sorted.length;
     $('#list-more-btn').textContent = 'Afficher ' + Math.min(200, sorted.length - shown) + ' de plus';
-    $('#export-csv').disabled = !sorted.length;
   }
   $('#list-more-btn').addEventListener('click', function(){ listN += 200; renderList(); });
   function rowOpen(tr){
@@ -3650,21 +3807,113 @@ table.list tbody tr:hover{background:#eef5f7}
     });
     return '﻿' + lines.join('\r\n') + '\r\n';
   }
-  $('#export-csv').addEventListener('click', function(){
-    if (sortedDirty) sortRows();
+  // v0.7.0 : export KMZ (Google Earth) du jeu filtré. Un dossier par classe d'ICG (le nom du dossier double la
+  // couleur, lisible sans distinguer les teintes) ; au clic : fiche résumée, photo du MTMD, lien vers l'atlas.
+  function kmlEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]; }); }
+  function kmlColor(hex){ return 'ff' + hex.substr(5, 2) + hex.substr(3, 2) + hex.substr(1, 2); }      // #rrggbb → aabbggrr
+  function buildKml(rows, opt){
+    opt = opt || {};
+    var ICG_K = ['1', '2', '3', '4', 'AC', 'SO'], COL = opt.colors || {}, LAB = opt.labels || {}, by = {};
+    rows.forEach(function(o){ var k = o.icg == null || !COL[o.icg] ? 'SO' : o.icg; (by[k] = by[k] || []).push(o); });
+    var ico = 'https://maps.google.com/mapfiles/kml/shapes/placemark_circle.png';
+    var h = ['<?xml version="1.0" encoding="UTF-8"?>', '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>',
+      '<name>' + kmlEsc(opt.title || 'QuickerAtlas') + '</name>',
+      '<description>' + kmlEsc(opt.desc || '') + '</description>'];
+    ICG_K.forEach(function(k){
+      if (!COL[k]) return;
+      // étiquette (n°) seulement au survol : des milliers de noms affichés d'un coup seraient illisibles
+      h.push('<Style id="n' + k + '"><IconStyle><color>' + kmlColor(COL[k]) + '</color><scale>0.8</scale><Icon><href>' + ico + '</href></Icon></IconStyle><LabelStyle><scale>0</scale></LabelStyle></Style>',
+        '<Style id="h' + k + '"><IconStyle><color>' + kmlColor(COL[k]) + '</color><scale>1.1</scale><Icon><href>' + ico + '</href></Icon></IconStyle><LabelStyle><scale>1</scale></LabelStyle></Style>',
+        '<StyleMap id="i' + k + '"><Pair><key>normal</key><styleUrl>#n' + k + '</styleUrl></Pair><Pair><key>highlight</key><styleUrl>#h' + k + '</styleUrl></Pair></StyleMap>');
+    });
+    ICG_K.forEach(function(k){
+      var list = by[k];
+      if (!list) return;
+      h.push('<Folder><name>' + kmlEsc((k === 'SO' ? 'ICG S. O. / inconnu' : 'ICG ' + k + ' — ' + (LAB[k] || '')) + ' (' + list.length + ')') + '</name>');
+      list.forEach(function(o){
+        var rowsD = [['Type', o.tl], ['Nom', o.nom], ['Route', o.route], ['Obstacle', o.obstacle], ['Municipalité', o.muncp], ['Région', o.region],
+          ['Année', o.annee], ['Longueur', o.long != null ? String(o.long).replace('.', ',') + ' m' : null], ['ICG', o.icg], ['IAS', o.ias], ['Gestionnaire', o.gest || 'MTMD']];
+        var d = (opt.photo && opt.photo(o) ? '<img src="' + kmlEsc(opt.photo(o)) + '" width="320"><br>' : '') +
+          '<table>' + rowsD.filter(function(r){ return r[1] != null && r[1] !== ''; }).map(function(r){ return '<tr><td><b>' + kmlEsc(r[0]) + '</b></td><td>' + kmlEsc(r[1]) + '</td></tr>'; }).join('') + '</table>' +
+          (opt.link ? '<p><a href="' + kmlEsc(opt.link(o)) + '">Fiche complète dans QuickerAtlas</a></p>' : '');
+        h.push('<Placemark><name>' + kmlEsc(o.num) + '</name><styleUrl>#i' + k + '</styleUrl>' +
+          '<description><![CDATA[' + d.replace(/]]>/g, ']]]]><![CDATA[>') + ']]></description>' +
+          '<Point><coordinates>' + (+o.lon).toFixed(6) + ',' + (+o.lat).toFixed(6) + ',0</coordinates></Point></Placemark>');
+      });
+      h.push('</Folder>');
+    });
+    h.push('</Document></kml>');
+    return h.join('\n');
+  }
+  // Archive ZIP d'un seul fichier (doc.kml) : compressée (deflate) si le navigateur sait le faire, sinon stockée
+  var CRC_T = null;
+  function crc32(b){
+    if (!CRC_T) { CRC_T = new Uint32Array(256); for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC_T[n] = c >>> 0; } }
+    var crc = 0xFFFFFFFF;
+    for (var i = 0; i < b.length; i++) crc = CRC_T[(crc ^ b[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+  function zipOne(name, raw, packed, method){
+    var nm = new TextEncoder().encode(name), crc = crc32(raw), d = new Date();
+    var dt = ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)) & 0xFFFF, dd = (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xFFFF;
+    var loc = new DataView(new ArrayBuffer(30)), cen = new DataView(new ArrayBuffer(46)), end = new DataView(new ArrayBuffer(22));
+    [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, method, 2], [10, dt, 2], [12, dd, 2], [14, crc, 4], [18, packed.length, 4], [22, raw.length, 4], [26, nm.length, 2], [28, 0, 2]]
+      .forEach(function(f){ loc['setUint' + f[2] * 8](f[0], f[1], true); });
+    [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, method, 2], [12, dt, 2], [14, dd, 2], [16, crc, 4], [20, packed.length, 4], [24, raw.length, 4], [28, nm.length, 2], [42, 0, 4]]
+      .forEach(function(f){ cen['setUint' + f[2] * 8](f[0], f[1], true); });
+    var cenOff = 30 + nm.length + packed.length;
+    [[0, 0x06054b50, 4], [8, 1, 2], [10, 1, 2], [12, 46 + nm.length, 4], [16, cenOff, 4]].forEach(function(f){ end['setUint' + f[2] * 8](f[0], f[1], true); });
+    return new Blob([loc, nm, packed, cen, nm, end], { type: 'application/vnd.google-earth.kmz' });
+  }
+  function kmzBlob(kml){
+    var raw = new TextEncoder().encode(kml);
+    if (!window.CompressionStream) return Promise.resolve(zipOne('doc.kml', raw, raw, 0));
+    try {
+      var cs = new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+      return new Response(cs).arrayBuffer().then(function(buf){ return zipOne('doc.kml', raw, new Uint8Array(buf), 8); }, function(){ return zipOne('doc.kml', raw, raw, 0); });
+    } catch (e) { return Promise.resolve(zipOne('doc.kml', raw, raw, 0)); }
+  }
+  function download(blob, ext){
     var d = new Date(), p2 = function(x){ return (x < 10 ? '0' : '') + x; };
-    var name = 'quickeratlasoa-' + d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '.csv';
-    var url = URL.createObjectURL(new Blob([buildCsv(sorted)], { type: 'text/csv;charset=utf-8' }));
+    var name = 'quickeratlas-' + d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '.' + ext;
+    var url = URL.createObjectURL(blob);
     var a = document.createElement('a'); a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }
+  var ATLAS_URL = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : 'https://acheruel.github.io/QuickerAtlas/';
+  function exportRows(){ if (sortedDirty) sortRows(); return sorted.filter(function(o){ return o.lat != null && o.lon != null; }); }
+  // Menu « Exporter » (v0.7.0) : s'ouvre au clic, se ferme au clic dehors ou par Échap
+  function setExpOpen(o){
+    var n = visible.length;
+    $('#exp-menu').hidden = !o; $('#exp-btn').setAttribute('aria-expanded', String(o));
+    if (!o) return;
+    $('#exp-h').textContent = n ? nf.format(n) + ' structure' + (n > 1 ? 's' : '') + ' filtrée' + (n > 1 ? 's' : '') + ' (filtres et recherche en cours)' : 'Aucune structure filtrée';
+    $('#exp-menu').querySelectorAll('[data-exp]').forEach(function(b){ b.disabled = !n; });
+  }
+  $('#exp-btn').addEventListener('click', function(){ setExpOpen($('#exp-menu').hidden); });
+  document.addEventListener('pointerdown', function(e){ if (!$('#exp-menu').hidden && !$('#exp').contains(e.target)) setExpOpen(false); });
+  $('#exp').addEventListener('keydown', function(e){ if (e.key === 'Escape' && !$('#exp-menu').hidden) { setExpOpen(false); $('#exp-btn').focus(); e.stopPropagation(); } });
+  $('#exp-menu').addEventListener('click', function(e){
+    var b = e.target.closest('[data-exp]');
+    if (!b || b.disabled) return;
+    var kind = b.getAttribute('data-exp');
+    setExpOpen(false);
+    if (kind === 'csv') { download(new Blob([buildCsv(exportRows())], { type: 'text/csv;charset=utf-8' }), 'csv'); return; }
+    var rows = exportRows();
+    var kml = buildKml(rows, { colors: ICG_COLOR, labels: ICG_LABEL, photo: photoUrl,
+      link: function(o){ return ATLAS_URL + '#s=' + encodeURIComponent(o.key); },
+      title: 'QuickerAtlas — ' + nf.format(rows.length) + ' structures (' + META.date + ')',
+      desc: 'Structures filtrées dans QuickerAtlas v' + META.version + '. Données : MTMD, Données Québec (CC BY 4.0) ; atlas non officiel.' });
+    kmzBlob(kml).then(function(blob){ download(blob, 'kmz'); });
   });
 
   // ---------- Cadrage ----------
   // Recadre sur les résultats quand la recherche ou la région change. Réinitialiser les filtres ne bouge
-  // plus la carte : le bouton « Québec » (sous le zoom) ramène la vue d'ensemble.
-  var HOME = { center: [47.0, -71.5], zoom: 6 }, lastFocus = null;
-  function focusKey(){ return state.q.trim() + '|' + state.region; }
+  // plus la carte. v0.7.0 : plus de bouton « Québec » ; vue de départ = QC_VUE (sud du Québec habité, de l'Outaouais à
+  // la Gaspésie, comme la capture de la demande)
+  var QC_VUE = [[45.0, -75.4], [49.3, -64.2]], lastFocus = null;
+  function focusKey(){ return state.q.trim() + (state.tags.length ? '#' + state.tags.join('#') : '') + '|' + state.region; }
   function reframe(force){
     var k = focusKey();
     if (!map || map.getSize().x === 0 || view !== 'carte') return;   // carte masquée : on recadrera à son retour
@@ -3692,7 +3941,42 @@ table.list tbody tr:hover{background:#eef5f7}
     if (state.vi && (villesState === 0 || villesState === 3)) ensureVilles().then(function(){ buildTypeOptions(); apply(); });
   }
   var debounced = function(){ clearTimeout(timer); timer = setTimeout(commit, 150); };
-  $('#q').addEventListener('input', debounced);
+  $('#q').addEventListener('input', function(){
+    // v0.7.0 : une virgule ou un point-virgule tapé ferme l'étiquette en cours
+    var v = this.value;
+    if (/[,;]/.test(v)) {
+      var parts = v.split(/[,;]/), last = parts.pop();
+      addTags(parseTags(parts.join(',')));
+      this.value = last.replace(/^\s+/, '');
+      renderTags(); clearTimeout(timer); commit(); return;
+    }
+    debounced();
+  });
+  $('#q').addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && this.value.trim()) {
+      e.preventDefault();
+      addTags(parseTags(this.value)); this.value = '';
+      renderTags(); clearTimeout(timer); commit();
+    } else if (e.key === 'Backspace' && !this.value && state.tags.length) {
+      state.tags.pop(); renderTags(); commit();
+    }
+  });
+  // Liste collée (colonne d'Excel, courriel…) : les retours de ligne disparaîtraient dans le champ ; découpée ici
+  $('#q').addEventListener('paste', function(e){
+    var t = (e.clipboardData || window.clipboardData).getData('text');
+    var list = parseTags(t);
+    if (list.length < 2) return;
+    e.preventDefault();
+    addTags(list); this.value = '';
+    renderTags(); clearTimeout(timer); commit();
+  });
+  $('#tagbox').addEventListener('click', function(e){
+    var b = e.target.closest('[data-tag]');
+    if (!b) { if (e.target === this || e.target.id === 'tags') $('#q').focus(); return; }
+    e.preventDefault();
+    state.tags.splice(+b.getAttribute('data-tag'), 1);
+    renderTags(); commit(); $('#q').focus();
+  });
   ['#annee-min', '#annee-max', '#long-min', '#hauteur-max'].forEach(function(s){ $(s).addEventListener('input', debounced); });
   ['#type', '#region', '#reseau', '#obst', '#icg', '#ias', '#lim-poids', '#hors-public', '#villes', '#chg'].forEach(function(s){ $(s).addEventListener('change', commit); });
   $('#type-clear').addEventListener('click', function(){
@@ -3865,7 +4149,7 @@ table.list tbody tr:hover{background:#eef5f7}
   // v0.6.5 : PGA, classes de site et zones de dégel couvrent toute la province : une seule à la fois
   var EXCLUSIFS = ['pga', 'classes', 'degel'];
   // v0.6.0 : nouvelle clé (couches sismiques renommées, nouveau panneau)
-  var DEFAULT_OVERLAYS = 'eau,rtss,rail,wikiponts', OVERLAY_KEY = 'pq-couches-v060';
+  var DEFAULT_OVERLAYS = 'eau,rtss,rail', OVERLAY_KEY   // v0.7.0 : sans les ponts remarquables (demande) = 'pq-couches-v060';
   // Ordre de dessin du canevas commun (bas → haut) : routes, rail, sondages ; les structures (MTMD et villes)
   // restent au-dessus parce qu'apply() les ajoute en dernier.
   function restack(){
@@ -3988,20 +4272,8 @@ table.list tbody tr:hover{background:#eef5f7}
     });
   }
   if (map) {
-    // Bouton « Québec » : vue d'ensemble manuelle
-    var Home = L.Control.extend({
-      options: { position: 'topleft' },
-      onAdd: function(){
-        var d = L.DomUtil.create('div', 'leaflet-bar home-ctl');
-        // v0.6.4 : maison pleine avec porte (l'ancien contour fin se lisait mal)
-        d.innerHTML = '<a href="#" role="button" title="Vue d’ensemble du Québec" aria-label="Vue d’ensemble du Québec"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3.2L2.6 11.4l1.3 1.5 1.6-1.4v9h5v-5.5h3v5.5h5v-9l1.6 1.4 1.3-1.5z" fill="currentColor"/></svg></a>';
-        L.DomEvent.disableClickPropagation(d);
-        d.firstChild.addEventListener('click', function(e){ e.preventDefault(); map.flyTo(HOME.center, HOME.zoom, { duration: 0.6 }); });
-        return d;
-      }
-    });
-    new Home().addTo(map);
-    new LayersPanel().addTo(map);           // v0.6.4 : sous « + », « − » et Québec (avant : en haut à droite)
+    // v0.7.0 : boutons « + », « − » et « Québec » retirés (demande) ; « Couches » et « Masquer » seuls en haut à gauche
+    new LayersPanel().addTo(map);
 
     map.on('zoomend', function(){
       var r = radiusFor(map.getZoom());
@@ -4055,6 +4327,7 @@ table.list tbody tr:hover{background:#eef5f7}
   if (map) {
     apply();
     lastFocus = '|';                       // vue initiale = province
+    map.fitBounds(QC_VUE, { padding: [0, 0], animate: false });     // v0.7.0 : cadre resserré (demande)
     if (focusKey() !== '|' && visible.length) map.fitBounds(L.latLngBounds(visible.map(function(o){ return [o.lat, o.lon]; })), { padding: [40, 40], maxZoom: 13 });
     lastFocus = focusKey();
     if (startSel != null && byNum[startSel]) select(byNum[startSel], { center: true, noHash: true, focus: false });
@@ -4068,8 +4341,12 @@ table.list tbody tr:hover{background:#eef5f7}
     var saved = DEFAULT_OVERLAYS;
     try {
       var sv = localStorage.getItem(OVERLAY_KEY); if (sv != null) saved = sv;
-      // v0.6.3 : la nouvelle couche des ponts remarquables s'affiche une première fois, même avec un choix enregistré
-      if (sv != null && !localStorage.getItem('pq-wikiponts-v063')) { saved += ',wikiponts'; localStorage.setItem('pq-wikiponts-v063', '1'); }
+      // v0.7.0 : ponts remarquables masqués par défaut (demande). La v0.6.3 les avait forcés une fois chez tout le
+      // monde : on les retire une fois du choix enregistré ; les recocher ensuite est respecté.
+      if (sv != null && !localStorage.getItem('pq-wikiponts-v070')) {
+        saved = sv.split(',').filter(function(k){ return k !== 'wikiponts'; }).join(',');
+        localStorage.setItem(OVERLAY_KEY, saved); localStorage.setItem('pq-wikiponts-v070', '1');
+      }
     } catch (e) { /* idem */ }
     OVERLAYS.forEach(function(ov){ if (saved.split(',').indexOf(ov.key) >= 0) ov.layer.addTo(map); });
     syncLayerUI();

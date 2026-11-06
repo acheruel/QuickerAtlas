@@ -96,7 +96,7 @@ au commerce extérieur) n'est publié nulle part en données ouvertes : depuis l
 tirée de `couche-rtss.js` (bit 1 du champ `flag`, `reseaux.drapeau_rssce`) = autoroutes et leurs bretelles + routes
 nationales 117, 175, 173, 133 et 185, soit ≈ 8 100 km de chaussées (officiel : 8 046 à 8 104 km selon les bilans).
 
-| Ponts remarquables (v0.6.3 ; v0.6.5 : infobox des articles anglais et français — construction début/fin, mise en service, longueur, portée, largeur, hauteur, dégagement, travées, piles, voies, conception, constructeur, débit, péage, coût ; textes français préférés, textes anglais signalés `txtEn` ; introduction entière en français et, si elle est au moins 1,6 fois plus longue, en anglais (`resumeEn`) ; 3 photos Flickr CC choisies à la main (`PHOTOS_EXTERNES`, trouvées par Openverse) ; clic sur la photo → article Wikipédia ; v0.6.4 : infobulle et fiche à droite comme le MTMD, case dans le panneau des filtres, lien Wikipédia seul — français, sinon anglais —, photos de secours : image Wikidata P18, catégorie Commons P373, photo choisie à la main, recherche Commons géolocalisée à 30 km ou fichier à 600 m dont le titre reprend le nom du pont et « bridge » ; sinon vue aérienne Esri) : 179 ponts du Canada hors inventaire du MTMD (étoiles, hors filtres et statistiques) + lien Wikipédia pour 159 ouvrages du MTMD (même nom à ≤ 3 km, ponts jumeaux compris ; un échangeur ou un tunnel ne se lie pas à l'article d'un pont) | `etl/wikiponts.py` | `data/couche-wikiponts.js` (~0,18 Mo) | Wikipédia anglais « List of bridges in Canada » (tableaux + liste par province), API Wikipédia (en, fr : coordonnées, image libre, résumé), Wikidata (CC0 : type, longueur, portée, ouverture, matériau, obstacle, conception, propriétaire, patrimoine, identifiant Structurae P454 ; requête SPARQL des ponts de la boîte du Québec pour l'appariement), Wikimedia Commons (auteur et licence de chaque image). Structurae : liens seulement (site fermé aux robots, droits réservés) |
+| Ponts remarquables (v0.6.3 ; v0.6.5 : infobox des articles anglais et français — construction début/fin, mise en service, longueur, portée, largeur, hauteur, dégagement, travées, piles, voies, conception, constructeur, débit, péage, coût ; textes français préférés, textes anglais signalés `txtEn` ; introduction entière en français et, si elle est au moins 1,6 fois plus longue, en anglais (`resumeEn`) ; 3 photos Flickr CC choisies à la main (`PHOTOS_EXTERNES`, trouvées par Openverse) ; clic sur la photo → article Wikipédia ; v0.6.4 : infobulle et fiche à droite comme le MTMD, case dans le panneau des filtres, lien Wikipédia seul — français, sinon anglais —, photos de secours : image Wikidata P18, catégorie Commons P373, photo choisie à la main, recherche Commons géolocalisée à 30 km ou fichier à 600 m dont le titre reprend le nom du pont et « bridge » ; sinon vue aérienne Esri) : 179 ponts du Canada hors inventaire du MTMD (étoiles, hors filtres et statistiques) + lien Wikipédia pour 159 ouvrages du MTMD (même nom à ≤ 3 km, ponts jumeaux compris ; un échangeur ou un tunnel ne se lie pas à l'article d'un pont ; v0.7.0 : photo de l'article — fr, sinon en, sinon Wikidata P18 — dans `mtmd[n°].img`, 108 articles sur 139, fiches « ponts remarquables » du MTMD) | `etl/wikiponts.py` | `data/couche-wikiponts.js` (~0,18 Mo) | Wikipédia anglais « List of bridges in Canada » (tableaux + liste par province), API Wikipédia (en, fr : coordonnées, image libre, résumé), Wikidata (CC0 : type, longueur, portée, ouverture, matériau, obstacle, conception, propriétaire, patrimoine, identifiant Structurae P454 ; requête SPARQL des ponts de la boîte du Québec pour l'appariement), Wikimedia Commons (auteur et licence de chaque image). Structurae : liens seulement (site fermé aux robots, droits réservés) |
 
 ## Constats de jointure (2026-10-11)
 
@@ -127,7 +127,8 @@ vers le nom de fichier versionné ; `.nojekyll` désactive Jekyll. Le site n'a b
 des HTML, de `sw.js`, de `js/` et de `data/` (sans `raw/` ni `ponts.sqlite`, exclus par `.gitignore`).
 
 **Modules à la demande** (v0.5.6) : `js/hydro.js` (fenêtre « Cours d'eau au pont »), `js/sismique.js` (fenêtre « Aléa
-sismique »), `js/environnement.js` (v0.6.7, fenêtre « Environnement ») et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR »,
+sismique »), `js/environnement.js` (v0.6.7, fenêtre « Environnement »), les prototypes `js/vue3d.js` et `js/climat.js`
+(v0.7.0) et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR »,
 contrat `window.QA_MOD.lidar.open(o)`) ne sont chargés qu'à la première ouverture. Contrat : `window.QA_MOD[clé].render(o, body, ctx)` ; la page leur
 prête `window.QA` (échappement, formats, `fetchT` borné dans le temps corps compris, `loadScript`, `distM`, `det`).
 
@@ -151,6 +152,36 @@ habitats fauniques lus dans `data/couche-environnement.js`, fond OSM atténué p
 la molette continu (gestionnaire `smoothWheel` de la page), tous les polygones dans un volet unique triés du plus grand
 au plus petit, remplissage léger pour ceux qui contiennent l'ouvrage, survol d'un thème qui estompe les autres, lien vers
 chaque jeu de Données Québec et chaque service.
+
+**v0.7.0** : plus de boutons « + », « − » ni « Québec » (`zoomControl: false`) ; vue de départ `QC_VUE`
+(45,0–49,3° N, 75,4–64,2° O, appliquée par `fitBounds`) ; ponts remarquables masqués par défaut (`DEFAULT_OVERLAYS`
+sans `wikiponts`, retirés une fois du choix enregistré : drapeau `pq-wikiponts-v070`). Étiquettes de la carte :
+`numLbl(o)` ajoute « P- » aux ponts du MTMD seulement. « Profil LiDAR » absent pour les murs, tunnels et ponceaux.
+**Recherche par étiquettes** (`state.tags`, hash `tg=a|b|c`) : `tagNum` normalise un n° (5 chiffres + suffixe,
+« P- » accepté), `parseTags` découpe une liste collée ; les étiquettes se combinent par « ou » ; un n° montre sa
+structure quels que soient les autres filtres, un mot les respecte. **Exporter** (`#exp`, menu) : CSV (ancien bouton
+de la Liste) et KMZ (`buildKml` : un dossier par classe d'ICG, style par classe, fiche résumée + photo + lien `#s=` ;
+`zipOne` écrit l'archive, compressée par `CompressionStream('deflate-raw')` si disponible). Ponts remarquables : section
+« inventaire du MTMD » en tête (`wpMtmdCards` : une carte par article, photo de l'article) ; dans la fiche du MTMD,
+photo Wikipédia d'abord et bascule « Wikipédia / MTMD » (`wikiImg`), lien Wikipédia en orange. Fenêtres prototypes
+(boutons en tirets « proto ») : `js/vue3d.js` (« Vue 3D du site ») et `js/climat.js` (« Climat futur »), même contrat
+`QA_MOD[clé].render` que les autres modules.
+
+**Vue 3D du site** (prototype v0.7.0, `js/vue3d.js`) : bloc de 1 km **au sol** autour de l'ouvrage (en EPSG:3857 :
+1000 / cos(lat) m), MNT ou MNS du WCS du Data Cube (`dtm`/`dsm`, grille imposée 400 × 400 ≈ 2,5 m par `GridOffsets`,
+≈ 0,6 Mo par couche), drapé de l'export Esri World_Imagery (1024 px, CORS ouvert) ou relief seul ; Three.js r147
+(`three.min.js` + `OrbitControls.js`, jsDelivr) chargé à la demande ; exagération 1× à 3×, boussole, échelle 1 km,
+rendu à la demande ; hors LiDAR (< 5 % de données) : message ; tout est libéré à la fermeture.
+
+**Climat futur** (prototype v0.7.0, `js/climat.js`) : cellule de 1/12° (≈ 6 × 10 km) qui contient l'ouvrage, sans note
+de risque. (1) GeoMet-Climate d'ECCC (WMS `GetFeatureInfo`, `info_format=text/plain` : plusieurs couches par requête ;
+`application/json` n'en accepte qu'une), couches CanDCS-U6 (CMIP6, BCCAQv2, 26 modèles)
+`CanDCSU6-<SSP>_<AirTemp|AirTempMax|AirTempMin|Precip>-Pct<10|50|90>_1971-2000_P0Y[-saison]` et
+`…<VAR>Anomaly-Pct…_<2021-2050|2041-2070|2071-2100>_P0Y[-saison]` (écarts de précipitations en mm, pas en %).
+(2) API OGC `climate:indices:{historical|projected}/coverage` (CMIP5, CanDCS-U5, RCP ; `bbox` + `subset=percentile(n),scenario(RCP…)`
+obligatoires, sinon toute la grille) pour jours > 30 °C, nuits tropicales, degrés-jours et jours de pluie : lente
+(5 à 55 s), affichée après les lignes CMIP6. Pas de jours de gel, cycles gel-dégel ni pluie max. 1 j / 5 j dans ces
+sources. CORS ouvert ; Licence du gouvernement ouvert – Canada.
 
 **LiDAR** (MNEHR 1 m de Ressources naturelles Canada, Licence du gouvernement ouvert – Canada) : fonds « Relief ombré
 MNT / MNS » en tuiles WMS, et bouton « Profil LiDAR » de la fiche, calculé à la demande dans le navigateur (WCS en

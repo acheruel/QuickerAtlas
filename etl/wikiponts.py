@@ -25,7 +25,9 @@ Sortie : `data/couche-wikiponts.js` :
 
     (window.PQ_COUCHES = window.PQ_COUCHES || {}).wikiponts = {
       "generated": "2026-10-19", "source": "<URL de la liste>", "attribution": "...",
-      "mtmd":  {"04296": {"fr": "Pont Pierre-Laporte", "en": "Pierre Laporte Bridge", "q": "Q761692", "st": "<id>"}, ...},
+      "mtmd":  {"04296": {"fr": "Pont Pierre-Laporte", "en": "Pierre Laporte Bridge", "q": "Q761692", "st": "<id>",
+                          "img": {"src": "...", "page": "...", "auteur": "...", "licence": "..."}}, ...},
+      (v0.7.0 : « img » = photo de l'article fr, sinon en, sinon Wikidata P18 : fiches « ponts remarquables » du MTMD)
       "ponts": [{"id": "Q865076", "nom": "...", "nomEn": "...", "prov": "Île-du-Prince-Édouard", "lat": 46.2, "lon": -63.7,
                  "an": 1997, "type": "pont à poutres", "long": 12900, "portee": 250, "mat": "béton précontraint",
                  "franchit": "détroit de Northumberland", "archi": "...", "prop": "...", "patri": "...",
@@ -741,12 +743,46 @@ def construire(liste: list[dict], art_en: dict, art_fr: dict, ent: dict, lib: di
         lien = {k: v for k, v in {"fr": pontish(src.get("fr")), "en": pontish(src.get("en")), "q": q, "st": st}.items() if v}
         if not (lien.get("fr") or lien.get("en")):
             continue
+        if (par_q.get(q) or {}).get("img"):
+            lien["img"] = par_q[q]["img"]                # v0.7.0 : photo de l'article (pont de la liste)
         for n in nums:
             mt.setdefault(n, lien)
     etoiles = [p for p in ponts if p["q"] not in liens]
     etoiles.sort(key=lambda p: (p.get("prov") or "~", p["nom"]))
     return {"generated": date.today().isoformat(), "source": URL_LISTE, "attribution": ATTRIBUTION,
             "mtmd": dict(sorted(mt.items())), "ponts": etoiles}
+
+
+def fichiers_photo_mtmd(liens, art_fr: dict, art_en: dict, ent: dict) -> dict[str, str]:
+    """v0.7.0 : ouvrages du MTMD liés à un article, sans photo → {q: fichier Commons} : image de l'article français,
+    sinon de l'article anglais, sinon image Wikidata (P18). Ce sont les photos que montre Wikipédia pour ce pont."""
+    out = {}
+    for v in liens:
+        if v.get("img"):
+            continue
+        f = ((art_fr.get(v.get("fr") or "") or {}).get("image") or (art_en.get(v.get("en") or "") or {}).get("image")
+             or faits_wikidata(ent.get(v["q"], {})).get("image"))
+        if f:
+            out[v["q"]] = f
+    return out
+
+
+def photos_mtmd(s, payload: dict, ent: dict, fetch: bool) -> int:
+    """v0.7.0 : ajoute « img » aux liens « mtmd » qui n'en ont pas (fiches des ponts remarquables de l'inventaire)."""
+    liens = {v["q"]: v for v in payload["mtmd"].values()}
+    manque = [v for v in liens.values() if not v.get("img")]
+    art_fr = infos_articles(s, [v["fr"] for v in manque if v.get("fr")], "fr", fetch)
+    art_en = infos_articles(s, [v["en"] for v in manque if v.get("en")], "en", fetch)
+    fic = fichiers_photo_mtmd(manque, art_fr, art_en, ent)
+    imgs = images(s, list(fic.values()), fetch)
+    for q, f in fic.items():
+        img = imgs.get(f) or imgs.get(f.replace(" ", "_"))
+        if img and img.get("src"):
+            liens[q]["img"] = img
+    for v in payload["mtmd"].values():                  # ouvrages jumeaux : même lien, même photo
+        if not v.get("img") and liens[v["q"]].get("img"):
+            v["img"] = liens[v["q"]]["img"]
+    return sum(1 for v in liens.values() if v.get("img"))
 
 
 def run(fetch: bool = True) -> dict:
@@ -779,6 +815,8 @@ def run(fetch: bool = True) -> dict:
             p["img"] = {**img, "origine": origine}
         elif not p.get("img") and p["q"] in PHOTOS_EXTERNES:
             p["img"] = {**PHOTOS_EXTERNES[p["q"]], "site": "Flickr", "origine": "flickr"}
+    n_photos_mtmd = photos_mtmd(s, payload, ent, fetch)
+    log.info("ouvrages du MTMD liés : %d articles avec photo", n_photos_mtmd)
     corps = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     OUT.write_text(f"window.PQ_COUCHES=window.PQ_COUCHES||{{}};window.PQ_COUCHES.wikiponts={corps};\n",
                    encoding="utf-8", newline="\n")

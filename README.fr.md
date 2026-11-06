@@ -13,14 +13,17 @@ plus rapide à explorer.
 ## Ce que vous pouvez faire
 
 - **Chercher et filtrer** : par nom, route, cours d’eau, municipalité, région, type de pont, année, longueur,
-  état (ICG), restrictions (IAS), limitation de poids ou de hauteur.
+  état (ICG), restrictions (IAS), limitation de poids ou de hauteur. Plusieurs structures à la fois : collez une liste
+  de numéros (ou tapez-les, séparés par des virgules), chacun devient une étiquette.
 - **Lire la fiche d’un ouvrage** : photo, dimensions, état, dernière inspection, trafic, repère kilométrique le plus
   proche (ou les deux repères qui l’encadrent), liens vers la fiche et le
   rapport d’inspection officiels du MTMD, et vers Wikipédia pour environ 160 ponts connus.
-- **Changer de point de vue** avec la barre d’onglets : carte, liste exportable (CSV), statistiques cliquables
+- **Exporter** les structures filtrées avec le bouton « Exporter » : CSV (tableur) ou KMZ (Google Earth).
+- **Changer de point de vue** avec la barre d’onglets : carte, liste, statistiques cliquables
   (rangées en cinq catégories : vue d’ensemble, régions, âge, caractéristiques, suivi et trafic), galerie (une structure
-  à la fois, en photo), « Quoi de neuf » (changements entre les mises à jour et inspections récentes), ou liste des
-  **ponts remarquables du Canada** (Wikipédia) : étoiles dorées sur la carte, hors filtres et statistiques.
+  à la fois, en photo), « Quoi de neuf » (changements entre les mises à jour et inspections récentes), ou
+  **ponts remarquables** : les ouvrages du MTMD qui ont un article Wikipédia (avec sa photo), puis les ponts du Canada
+  hors inventaire (étoiles dorées sur la carte, hors filtres et statistiques).
 - **Ajouter des couches** : réseau routier et ferroviaire, cours d’eau, sondages géotechniques, aléa sismique et
   classes de site, zones de dégel du MTMD, **débits de circulation** (DJMA de tout le réseau, comme la carte du MTMD), repères
   kilométriques, **caméras de circulation de Québec 511** (vidéo en direct au survol), autres
@@ -28,6 +31,8 @@ plus rapide à explorer.
 - **Outils d’ingénierie** (dans la fiche) : profil LiDAR (hauteur sous l’ouvrage, pentes), cours d’eau et débits au
   pont, **environnement** (aires protégées, habitats fauniques et floristiques, espèces en situation précaire, milieux
   humides, zones inondables et espèces envahissantes à 1, 2 ou 5 km), aléa sismique du code national du bâtiment.
+  Deux prototypes à l’essai : **vue 3D du site** (bloc LiDAR de 1 km² avec l’image satellite) et **climat futur**
+  (scénarios climatiques d’ECCC à l’ouvrage).
 
 Chaque vue garde ses filtres dans l’adresse : copiez le lien pour partager exactement ce que vous voyez.
 

@@ -187,3 +187,17 @@ def test_couper_a_la_phrase():
 def test_court_au_mot():
     assert wp.court("abc def ghi", 7) == "abc…"
     assert wp.court("abc", 7) == "abc"
+
+
+def test_fichiers_photo_mtmd_ordre_fr_en_wikidata():
+    """v0.7.0 : photo des ouvrages du MTMD liés : article français, sinon anglais, sinon image Wikidata (P18)."""
+    liens = [{"q": "Q1", "fr": "Pont A", "en": "A Bridge"},
+             {"q": "Q2", "fr": "Pont B", "en": "B Bridge"},
+             {"q": "Q3", "en": "C Bridge"},
+             {"q": "Q4", "fr": "Pont D", "img": {"src": "deja.jpg"}},
+             {"q": "Q5", "fr": "Pont E"}]
+    art_fr = {"Pont A": {"image": "A_fr.jpg"}, "Pont B": {"image": None}}
+    art_en = {"A Bridge": {"image": "A_en.jpg"}, "B Bridge": {"image": "B_en.jpg"}}
+    ent = {"Q3": {"claims": {"P18": [{"mainsnak": {"datavalue": {"value": "C_wd.jpg"}}}]}}}
+    out = wp.fichiers_photo_mtmd(liens, art_fr, art_en, ent)
+    assert out == {"Q1": "A_fr.jpg", "Q2": "B_en.jpg", "Q3": "C_wd.jpg"}

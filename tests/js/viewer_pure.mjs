@@ -151,4 +151,33 @@ assert.equal(rkTexte(RK, [0, 5, 120, 4, 4.9, 0, 0]), 'Autoroute 40 : entre km 4 
 assert.equal(rkTexte(RK, [1, 18, 40, null, null, null, 0]), 'Route 172 : au km 18');
 assert.equal(rkTexte(RK, [1, 3.3, 1048, null, null, null, 1]), 'Route 172 : à 1,0 km du km 3,3 (route franchie)');
 assert.equal(rkTexte(RK, [1, 18, 456, null, null, null, 0]), 'Route 172 : à 460 m du km 18');
+// v0.7.0 : étiquettes de recherche (n° normalisés sur 5 chiffres, « P- » accepté ; listes collées découpées)
+const tagNum = fn('tagNum');
+assert.equal(tagNum('4296'), '04296');
+assert.equal(tagNum(' P-04296 '), '04296');
+assert.equal(tagNum('p 7724'), '07724');
+assert.equal(tagNum('9788s'), '09788S');
+assert.equal(tagNum('12345AB'), '12345AB');
+assert.equal(tagNum('Papineau'), null);
+assert.equal(tagNum('route 25'), null);
+const parseTags = fn('parseTags', extract('tagNum'));
+assert.deepEqual(parseTags('04296, 07724;00003\n12345'), ['04296', '07724', '00003', '12345']);
+assert.deepEqual(parseTags('04296 07724 P-3'), ['04296', '07724', 'P-3']);      // n° séparés par des espaces
+assert.deepEqual(parseTags('pont Champlain, 04296'), ['pont Champlain', '04296']);  // mots gardés entiers
+// v0.7.0 : « P- » sur la carte pour les ponts du MTMD seulement
+const numLbl = fn('numLbl');
+assert.equal(numLbl({ num: '04296', fam: 'pont' }), 'P-04296');
+assert.equal(numLbl({ num: '12345', fam: 'ponceau' }), '12345');
+assert.equal(numLbl({ num: 'M-1', fam: 'pont', src: 'mtl' }), 'M-1');
+// v0.7.0 : KMZ — CRC-32 (valeur de référence de « 123456789 ») et KML bien formé, échappé, groupé par ICG
+const crc32 = fn('crc32', 'var CRC_T = null;');
+assert.equal(crc32(new TextEncoder().encode('123456789')), 0xCBF43926);
+const buildKml = fn('buildKml', extract('kmlEsc') + extract('kmlColor'));
+const kml = buildKml([{ num: '04296', nom: 'Pont <A & B>', lat: 46.7, lon: -71.3, icg: '2' }, { num: '1', lat: 45, lon: -73, icg: null }],
+  { colors: { '2': '#ef6c00', SO: '#8c969d' }, labels: { '2': 'Travaux majeurs' }, link: o => 'https://x/#s=' + o.num, title: 'T' });
+assert.ok(kml.includes('<color>ff006cef</color>'));                        // #ef6c00 → aabbggrr
+assert.ok(kml.includes('Pont &lt;A &amp; B&gt;'));
+assert.ok(kml.includes('<coordinates>-71.300000,46.700000,0</coordinates>'));
+assert.ok(kml.includes('ICG 2 — Travaux majeurs (1)') && kml.includes('ICG S. O. / inconnu (1)'));
+assert.equal((kml.match(/<Placemark>/g) || []).length, 2);
 console.log('viewer_pure : ok (' + html + ')');
