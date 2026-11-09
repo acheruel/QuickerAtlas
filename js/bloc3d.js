@@ -15,6 +15,7 @@
     river: { name: 'Cours d’eau', color: '#0072B2', dash: null, fill: 0.34, poly: true },
     water: { name: 'Plan d’eau', color: '#56B4E9', dash: '7 4', fill: 0.34, poly: true },
     forest: { name: 'Forêt', color: '#009E73', dash: '2 5', fill: 0.3, poly: true },
+    grass: { name: 'Herbe', color: '#F0E442', dash: '8 3 2 3', fill: 0.25, poly: true }, // v0.7.3 : masque manuel, aussi éditable dans BS3D
     road: { name: 'Route', color: '#E69F00', dash: null, fill: 0, poly: false }
   };
   var SRC = { osm: 'OSM', auto: 'auto', user: 'manuel' };
@@ -53,7 +54,7 @@
     S.svg = L.svg({ pane: 'b3dPane' });
     var wrap = $('#view-carte');
     var p = document.createElement('aside');
-    p.id = 'b3d-panel'; p.className = 'b3d'; p.setAttribute('aria-label', 'Bloc 3D pour BridgeSketch 3D'); p.hidden = true;
+    p.id = 'b3d-panel'; p.className = 'b3d'; p.setAttribute('aria-label', 'Export vers Bridge Sketch 3D'); p.hidden = true;
     wrap.appendChild(p);
     L.DomEvent.disableClickPropagation(p); L.DomEvent.disableScrollPropagation(p);
     p.addEventListener('click', onPanelClick);
@@ -76,7 +77,7 @@
     $('#view-carte').appendChild(b);
   }
   function render(){
-    var p = S.panel, h = '<div class="b3d-head"><div><b>Bloc 3D pour BridgeSketch 3D</b><small>MNT/MNS 1 m de RNCan, imagerie Esri, OpenStreetMap</small></div>' +
+    var p = S.panel, h = '<div class="b3d-head"><div><b>Export vers Bridge Sketch 3D</b><small>Préparer le site · définir le pont et corriger les zones dans BS3D</small></div>' +
       '<button type="button" class="b3d-x" data-act="close" aria-label="Fermer" title="Fermer">×</button></div><div class="b3d-body">';
     if (S.mode === 'select') h += selectHtml();
     else if (S.mode === 'busy') h += busyHtml();
@@ -110,7 +111,7 @@
     var sw = z.type === 'road'
       ? '<svg viewBox="0 0 22 14" width="22" height="14" aria-hidden="true"><path d="M1 11 11 3 21 9" stroke="' + T.color + '" stroke-width="4" fill="none" stroke-linecap="round"/></svg>'
       : '<svg viewBox="0 0 22 14" width="22" height="14" aria-hidden="true"><rect x="2" y="2" width="18" height="10" rx="2" fill="' + T.color + '" fill-opacity="' + (T.fill + 0.2) + '" stroke="' + T.color + '" stroke-width="2"' + (T.dash ? ' stroke-dasharray="' + T.dash + '"' : '') + '/></svg>';
-    var typ = z.polygon ? '<select data-act="type" aria-label="Type de la zone">' + ['river', 'water', 'forest'].map(function(k){ return '<option value="' + k + '"' + (k === z.type ? ' selected' : '') + '>' + TYPES[k].name + '</option>'; }).join('') + '</select>'
+    var typ = z.polygon ? '<select data-act="type" aria-label="Type de la zone">' + ['river', 'water', 'forest', 'grass'].map(function(k){ return '<option value="' + k + '"' + (k === z.type ? ' selected' : '') + '>' + TYPES[k].name + '</option>'; }).join('') + '</select>'
       : '<span class="b3d-zn">Route</span><label class="b3d-w">larg. <input type="number" min="3" max="25" step="0.5" value="' + z.width + '" data-act="width" aria-label="Largeur de la route en mètres"> m</label>';
     return '<li class="b3d-z' + (S.sel === z.id ? ' sel' : '') + '" data-id="' + z.id + '"><span class="b3d-sw">' + sw + '</span><span class="b3d-zm">' + typ +
       '<small>' + SRC[z.source] + ' · ' + (z.polygon ? fmt(C.polygonArea(z.polygon)) + ' m²' : fmt(len) + ' m') + ' · ' + n + ' pts</small></span>' +
@@ -137,9 +138,13 @@
         '<div class="b3d-row"><button type="button" data-act="canceltool">Annuler</button></div></div>';
     } else {
       h += '<div class="b3d-sec"><div class="b3d-h">Zones (' + S.zones.length + ')</div>' +
-        (S.zones.length ? '<ul class="b3d-zl">' + S.zones.map(zoneRow).join('') + '</ul>' : '<p class="muted">Aucune zone détectée. Ajoutez-en avec les boutons ci-dessous.</p>') +
-        '<div class="b3d-row b3d-wrap"><span class="b3d-lbl">Ajouter</span>' + ['river', 'water', 'forest', 'road'].map(function(k){ return '<button type="button" data-act="add" data-t="' + k + '">' + TYPES[k].name + '</button>'; }).join('') + '</div>' +
-        '<p class="b3d-note">Sélectionnez « Modifier » (ou cliquez une zone) pour déplacer ses sommets ; clic sur un petit point intermédiaire = nouveau sommet ; double-clic sur un sommet = le retirer.</p></div>' +
+        // v0.7.3 : zones regroupées par famille (repliables, compteur) ; la famille de la zone choisie reste ouverte
+        (S.zones.length ? Object.keys(TYPES).map(function(k){
+          var zs = S.zones.filter(function(z){ return z.type === k; });
+          return zs.length ? '<details class="b3d-fam"' + (zs.some(function(z){ return z.id === S.sel; }) ? ' open' : '') + '><summary>' + TYPES[k].name + ' (' + zs.length + ')</summary><ul class="b3d-zl">' + zs.map(zoneRow).join('') + '</ul></details>' : '';
+        }).join('') :'<p class="muted">Aucune zone détectée. Ajoutez-en avec les boutons ci-dessous.</p>') +
+        '<div class="b3d-row b3d-wrap"><span class="b3d-lbl">Ajouter</span>' + ['river', 'water', 'forest', 'grass', 'road'].map(function(k){ return '<button type="button" data-act="add" data-t="' + k + '">' + TYPES[k].name + '</button>'; }).join('') + '</div>' +
+        '<p class="b3d-note">Correction facultative ici : les zones restent modifiables dans BS3D. Sélectionnez « Modifier » (ou cliquez une zone) pour déplacer ses sommets ; clic sur un petit point intermédiaire = nouveau sommet ; double-clic sur un sommet = le retirer.</p></div>' +
         '<div class="b3d-sec"><div class="b3d-h">Axe du pont</div><p class="b3d-ax" id="b3d-ax">' + esc(axisText()) + '</p>' +
         '<div class="b3d-row b3d-wrap"><button type="button" data-act="axis">' + (S.axis ? 'Replacer l’axe (2 clics)' : 'Placer l’axe (2 clics)') + '</button>' + (S.axis ? '<button type="button" data-act="axisdel">Retirer l’axe</button>' : '') + '</div></div>';
     }
@@ -311,7 +316,7 @@
     var det = C.detect({ grid: grid, img: im ? { px: im.px, w: im.w, h: im.h } : null, mnt: mnt, mns: mns, osm: osm });
     var zones = osm.zones.concat(det.zones).map(function(z){
       var q = { id: S.nextId++, type: z.type, source: z.source };
-      if (z.type === 'road') { q.line = z.line; q.width = Math.round((z.width || 7) * 2) / 2; } else q.polygon = z.polygon;
+      if (z.type === 'road') { q.line = z.line; q.width = Math.round((z.width || 7) * 2) / 2; q.lanes = z.lanes; q.oneway = z.oneway; q.bridge = z.bridge; } else q.polygon = z.polygon; // v0.7.3 : attributs OSM conservés
       return q;
     });
     var zmin = Infinity, zmax = -Infinity;
@@ -486,7 +491,7 @@
     if (!d.imageObj && d.jpeg) d.imageObj = { dataUrl: d.jpeg, attribution: 'Esri World Imagery' };
     return C.buildPacket({
       frame: { lat: d.F.lat, lon: d.F.lon }, grid: d.grid, mnt: d.mnt, mns: d.mns, image: d.imageObj || null,
-      zones: S.zones.map(function(z){ return { type: z.type, source: z.source, polygon: z.polygon, line: z.line, width: z.width }; }),
+      zones: S.zones.map(function(z){ return { type: z.type, source: z.source, polygon: z.polygon, line: z.line, width: z.width, lanes: z.lanes, oneway: z.oneway, bridge: z.bridge }; }),
       bridge: S.axis ? { axis: S.axis, structure: S.o ? { id: String(S.o.num), name: structName(S.o) } : null } : null,
       attribution: d.attribution
     });
@@ -500,13 +505,35 @@
     setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
     status('ok', 'Fichier « ' + esc(fileName()) + ' » téléchargé (' + QA.nf1.format(blob.size / 1048576) + ' Mo). Dans BridgeSketch 3D : « IMPORT MNT/MNS » › Ouvrir un fichier.');
   }
+  // v0.7.3 : accusé de réception de BridgeSketch 3D (0.6.9+) : « reçu et validé », « appliqué », « fermé » ou « erreur ».
+  // Seuls les messages de la fenêtre destinataire et portant l'identifiant du transfert sont pris en compte.
+  function listenAck(target, id, sent){
+    if (S.ack) S.ack.stop();
+    var timer, step = function(n){ return '<span class="b3d-ack">' + ['Envoyé', 'Reçu et validé', 'Appliqué'].map(function(t, i){ return '<span class="' + (i < n ? 'on' : '') + '">' + (i < n ? '✓ ' : '○ ') + t + '</span>'; }).join(' → ') + '</span>'; };
+    var stop = function(){ clearTimeout(timer); window.removeEventListener('message', onAck); S.ack = null; };
+    var onAck = function(ev){
+      var d = ev.data;
+      if (ev.source !== target || !d || d.type !== 'bs3d-terrain-ack' || d.id !== id) return;
+      if (d.state === 'received') { clearTimeout(timer); status('ok', step(2) + '<br>BridgeSketch 3D a validé le paquet (' + (+d.zones || 0) + ' zone' + (d.zones > 1 ? 's' : '') + '). Définissez le pont dans sa boîte, puis « Créer le pont sur ce site ».'); }
+      else if (d.state === 'applied') { stop(); status('ok', step(3) + '<br>Le site et le pont sont en place dans BridgeSketch 3D.'); }
+      else if (d.state === 'closed') { stop(); status('busy', step(2) + '<br>La boîte de BridgeSketch 3D a été fermée sans appliquer le site. Renvoyez le bloc pour reprendre.'); }
+      else if (d.state === 'error') { stop(); status('err', '✗ Refusé par BridgeSketch 3D : ' + esc(String(d.message || 'paquet invalide'))); }
+    };
+    window.addEventListener('message', onAck);
+    timer = setTimeout(function(){ window.removeEventListener('message', onAck); S.ack = null; status('busy', step(1) + '<br>' + sent + ' Aucun accusé de réception en 15 s : version de BridgeSketch 3D sans accusé, ou onglet en arrière-plan. Vérifiez la fenêtre BridgeSketch 3D.'); }, 15000);
+    S.ack = { stop: stop };
+    return step(1);
+  }
   function post(target, origin){
     var p = packet(), errs = C.validatePacket(p);
     if (errs.length) { status('err', 'Paquet non conforme : ' + esc(errs.join(', '))); return false; }
-    var m = C.packetForPost(p);
+    var m = C.packetForPost(p), id = 'qa-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+    m.message.transferId = id;
+    var mo = (p.mnt.length + (p.mns ? p.mns.length : 0)) * 4 / 1048576,
+      sent = 'Terrain envoyé (' + QA.nf1.format(mo) + ' Mo de grilles' + (p.image ? ' + image' : '') + ', ' + p.zones.length + ' zone' + (p.zones.length > 1 ? 's' : '') + (p.bridge ? ', axe du pont' : ', sans axe de pont') + ').';
+    var head = listenAck(target, id, sent);
     target.postMessage(m.message, origin, m.transfer);
-    var mo = (p.mnt.length + (p.mns ? p.mns.length : 0)) * 4 / 1048576;
-    status('ok', 'Terrain envoyé à BridgeSketch 3D (' + QA.nf1.format(mo) + ' Mo de grilles' + (p.image ? ' + image' : '') + ', ' + p.zones.length + ' zone' + (p.zones.length > 1 ? 's' : '') + (p.bridge ? ', axe du pont' : ', sans axe de pont') + '). Passez à la fenêtre BridgeSketch 3D.');
+    status('ok', head + '<br>' + sent + ' En attente de l’accusé de réception de BridgeSketch 3D…');
     return true;
   }
   function send(){

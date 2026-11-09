@@ -7,7 +7,7 @@
 (function(root){
   'use strict';
   var R = 6378137, MAX_CELLS = 1500000, MAX_SIDE = 1500;
-  var B = { R: R, MAX_CELLS: MAX_CELLS, MAX_SIDE: MAX_SIDE, SOURCE: 'QuickerAtlas v0.7.2' };
+  var B = { R: R, MAX_CELLS: MAX_CELLS, MAX_SIDE: MAX_SIDE, SOURCE: 'QuickerAtlas v0.7.3' };
 
   // ---------- Repère ----------
   B.merc = function(lat, lon){ return [lon * Math.PI / 180 * R, Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * R]; };
@@ -93,7 +93,13 @@
       mnt: o.mnt, mns: o.mns || null, image: o.image || null,
       zones: (o.zones || []).map(function(z){
         var q = { type: z.type, source: z.source || 'user' };
-        if (z.type === 'road') { q.line = z.line.map(function(p){ return [p[0], p[1]]; }); q.width = z.width || 7; }
+        if (z.type === 'road') {
+          q.line = z.line.map(function(p){ return [p[0], p[1]]; }); q.width = z.width || 7;
+          // v0.7.3 : attributs OSM conservés quand ils existent (voies, sens unique 1/-1, tronçon sur ouvrage)
+          if (z.lanes > 0) q.lanes = Math.min(8, Math.round(z.lanes));
+          if (z.oneway === 1 || z.oneway === -1) q.oneway = z.oneway;
+          if (z.bridge) q.bridge = true;
+        }
         else q.polygon = z.polygon.map(function(p){ return [p[0], p[1]]; });
         return q;
       }),
@@ -132,7 +138,7 @@
     else p.zones.forEach(function(z, i){
       var okSrc = z && ['osm', 'auto', 'user'].indexOf(z.source) >= 0, pts = z && (z.type === 'road' ? z.line : z.polygon);
       var okPts = Array.isArray(pts) && pts.length >= (z.type === 'road' ? 2 : 3) && pts.every(function(q){ return Array.isArray(q) && q.length === 2 && isNum(q[0]) && isNum(q[1]); });
-      if (!z || ['river', 'water', 'forest', 'road'].indexOf(z.type) < 0 || !okSrc || !okPts || (z.type === 'road' && !(z.width > 0))) e.push('zones[' + i + ']');
+      if (!z || ['river', 'water', 'forest', 'grass', 'road'].indexOf(z.type) < 0 || !okSrc || !okPts || (z.type === 'road' && !(z.width > 0))) e.push('zones[' + i + ']');
     });
     if (p.bridge !== null && p.bridge !== undefined) {
       var ax = p.bridge.axis;
@@ -522,6 +528,7 @@
     // Zones OSM : elles l'emportent là où elles existent (les cellules qu'elles couvrent sont retirées de la détection)
     var osmM = { water: new Uint8Array(N), forest: new Uint8Array(N), road: new Uint8Array(N) }, osmZ = (o.osm && o.osm.zones) || [];
     osmZ.forEach(function(z){
+      if (z.type === 'grass') return;
       if (z.type === 'road') rasterLine(osmM.road, z.line, (z.width || 7) + 2, G);
       else rasterPoly(osmM[z.type === 'forest' ? 'forest' : 'water'], z.polygon, G);
     });
@@ -595,6 +602,7 @@
       'way[natural=water](' + bb + ');way[waterway~"^(riverbank|river|stream|canal|drain|ditch)$"](' + bb + ');' +
       'rel[natural=water](' + bb + ');rel[waterway=riverbank](' + bb + ');' +
       'way[natural=wood](' + bb + ');way[landuse=forest](' + bb + ');rel[natural=wood](' + bb + ');rel[landuse=forest](' + bb + ');' +
+      'way[landuse~"^(grass|meadow|recreation_ground)$"](' + bb + ');way[natural=grassland](' + bb + ');way[leisure=park](' + bb + ');' +
       'way[highway~"^(' + B.OSM_HIGHWAYS + ')$"](' + bb + ');way[man_made=bridge](' + bb + ');' +
       ');out geom;';
   };
@@ -612,7 +620,13 @@
     els.forEach(function(el){
       var t = el.tags || {};
       var isWater = t.natural === 'water' || t.waterway === 'riverbank', isForest = t.natural === 'wood' || t.landuse === 'forest';
-      if ((isWater || isForest) && el.type === 'way') {
+      // v0.7.3 : herbe / sol ouvert (pelouse, pré, parc) : zone « grass », aussi modifiable dans BS3D
+      var isGrass = !isWater && !isForest && (/^(grass|meadow|recreation_ground)$/.test(t.landuse || '') || t.natural === 'grassland' || t.leisure === 'park');
+      if (isGrass && el.type === 'way') {
+        var gring = loc(el.geometry);
+        if (gring.length > 3 && gring[0][0] === gring[gring.length - 1][0] && gring[0][1] === gring[gring.length - 1][1]) gring.pop();
+        addPoly(gring, 'grass');
+      } else if ((isWater || isForest) && el.type === 'way') {
         var ring = loc(el.geometry);
         if (ring.length > 3 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]) ring.pop();
         if (isForest) addPoly(ring, 'forest');
@@ -649,7 +663,12 @@
       if (t.bridge && t.bridge !== 'no' || t.man_made === 'bridge') bridges.push({ line: line, name: t.name || t.ref || null, highway: t.highway || null });
       if (!t.highway || !HW_WIDTH[t.highway]) return;
       var width = tagNum(t.width) || (tagNum(t.lanes) ? tagNum(t.lanes) * 3.5 : null) || HW_WIDTH[t.highway] || 6;
-      B.clipLine(line, rc).forEach(function(part){ zones.push({ type: 'road', source: 'osm', line: part, width: Math.max(3, Math.min(25, width)), bridge: !!(t.bridge && t.bridge !== 'no') }); });
+      var lanes = tagNum(t.lanes), oneway = t.oneway === 'yes' || t.oneway === '1' || t.junction === 'roundabout' ? 1 : t.oneway === '-1' ? -1 : 0;
+      B.clipLine(line, rc).forEach(function(part){
+        var z = { type: 'road', source: 'osm', line: part, width: Math.max(3, Math.min(25, width)), bridge: !!(t.bridge && t.bridge !== 'no') };
+        if (lanes > 0) z.lanes = lanes; if (oneway) z.oneway = oneway;
+        zones.push(z);
+      });
     });
     return { zones: zones, bridges: bridges };
   };

@@ -132,10 +132,13 @@ officiel en v0.7.1) et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR »,
 contrat `window.QA_MOD.lidar.open(o)`) ne sont chargés qu'à la première ouverture. Contrat : `window.QA_MOD[clé].render(o, body, ctx)` ; la page leur
 prête `window.QA` (échappement, formats, `fetchT` borné dans le temps corps compris, `loadScript`, `distM`, `det`).
 
-**Bloc 3D pour BridgeSketch 3D** (v0.7.2) : `js/bloc3d.js` (interface : rectangle, extraction, zones modifiables, axe du pont,
-envoi), `js/bloc3d-calc.js` (fonctions pures, sans DOM ni réseau, testées par `tests/js/bloc3d_calc.mjs`) et `js/lidar.js`
+**Export vers Bridge Sketch 3D** (v0.7.2, nom depuis v0.7.3 ; bouton « Export BS3D ») : `js/bloc3d.js` (interface : rectangle,
+extraction, zones modifiables regroupées par famille, axe du pont, envoi avec accusé de réception), `js/bloc3d-calc.js` (fonctions pures, sans DOM ni réseau, testées par `tests/js/bloc3d_calc.mjs`) et `js/lidar.js`
 (GeoTIFF, WCS et Esri, exposés par `QA_MOD.lidar._geo` : `wcsBox(kind, bb, step, ms)`, `imgBox(bb, nw, nh, ms)`) sont chargés
-à la première ouverture du bouton « Bloc 3D » (panneau des couches ou fiche). Le paquet `bs3d-terrain` v1 est décrit dans
+à la première ouverture du bouton « Export BS3D » (panneau des couches ou fiche). v0.7.3 : zones `grass` (OSM
+`landuse=grass|meadow|recreation_ground`, `natural=grassland`, `leisure=park`, ou tracées à la main) ; routes avec `lanes`,
+`oneway`, `bridge` ; `transferId` dans le message et écoute de `bs3d-terrain-ack` (états reçu / appliqué / fermé / erreur,
+15 s sans réponse = ancienne version de BS3D) ; le pont lui-même se paramètre dans BS3D (pont neutre, pont B). Le paquet `bs3d-terrain` v1 est décrit dans
 [bs3d-terrain-v1.md](bs3d-terrain-v1.md) (copie du contrat partagé avec BridgeSketch 3D).
 - **Repère** : grille locale centrée sur le bloc, x vers l'est, y vers le nord, mètres au sol (Mercator × cos φ), ligne 0 au
   nord ; pas de 1 m jusqu'à 1,5 M de cellules, sinon 2 m ; côté ≤ 1 500 m.

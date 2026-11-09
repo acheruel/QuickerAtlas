@@ -236,6 +236,7 @@ ok('OSM : eau, forêt, route, pont convertis en mètres locaux et découpés au 
     { type: 'way', tags: { landuse: 'forest' }, geometry: [ll(50, 50), ll(300, 50), ll(300, 300), ll(50, 300), ll(50, 50)] },
     { type: 'way', tags: { highway: 'primary', bridge: 'yes', name: 'Pont X', lanes: '2' }, geometry: [ll(-150, 0), ll(150, 0)] },
     { type: 'way', tags: { highway: 'footway' }, geometry: [ll(-50, 10), ll(50, 10)] },
+    { type: 'way', tags: { leisure: 'park' }, geometry: [ll(-90, 60), ll(-60, 60), ll(-60, 90), ll(-90, 90), ll(-90, 60)] },
     { type: 'way', tags: { waterway: 'stream' }, geometry: [ll(-100, -90), ll(100, -90)] },
     { type: 'way', tags: { waterway: 'river' }, geometry: [ll(-80, 0), ll(80, 0)] },                       // dans le lac : pas élargie
     { type: 'relation', tags: { natural: 'water', type: 'multipolygon' }, members: [
@@ -248,11 +249,18 @@ ok('OSM : eau, forêt, route, pont convertis en mètres locaux et découpés au 
   near(B.polygonArea(t('forest')[0].polygon), 50 * 50, 1, 'forêt découpée à 100 m');
   assert.equal(t('road').length, 1);                                              // le sentier (footway) n'est pas demandé mais l'élément reste ignoré
   near(t('road')[0].width, 7, 1e-9);                                              // 2 voies × 3,5 m
+  assert.equal(t('road')[0].lanes, 2); assert.equal(t('road')[0].bridge, true);
+  assert.equal(t('grass').length, 1); near(B.polygonArea(t('grass')[0].polygon), 900, 1, 'parc OSM -> herbe');
   assert.deepEqual(t('road')[0].line.map(function(p){ return Math.round(p[0]); }), [-100, 100]);
   assert.equal(R.bridges.length, 1); assert.equal(R.bridges[0].name, 'Pont X');
   assert.ok(R.zones.every(function(z){ return z.source === 'osm'; }));
   var q = B.overpassQuery(46.79, -71.21, 46.81, -71.19);
-  assert.ok(/natural=water/.test(q) && /highway~/.test(q) && /out geom/.test(q) && /46\.790000,-71\.210000,46\.810000,-71\.190000/.test(q));
+  var pk = B.buildPacket({ frame: F, grid: { cols: 2, rows: 2, cell: 1, x0: 0, y0: 1 }, mnt: new Float32Array(4), zones: R.zones });
+  var road = pk.zones.filter(function(z){ return z.type === 'road'; })[0];
+  assert.equal(road.lanes, 2); assert.equal(road.bridge, true); assert.equal(road.oneway, undefined);
+  assert.ok(pk.zones.some(function(z){ return z.type === 'grass' && z.polygon; }));
+  assert.deepEqual(B.validatePacket(pk), []);
+  assert.ok(/natural=water/.test(q) && /leisure=park/.test(q) && /highway~/.test(q) && /out geom/.test(q) && /46\.790000,-71\.210000,46\.810000,-71\.190000/.test(q));
 });
 ok('axe du pont proposé : tronçon « pont » OSM, sinon route, sinon est-ouest ; orienté ouest -> est', function(){
   var bridges = [{ line: [[40, 12], [-40, 2]], name: null }], roads = [[[-100, 0], [100, 0]]];

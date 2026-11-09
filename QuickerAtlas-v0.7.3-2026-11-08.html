@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QuickerAtlas v0.7.2 · Atlas d’ouvrages d’art au Québec</title>
+<title>QuickerAtlas v0.7.3 · Atlas d’ouvrages d’art au Québec</title>
 <!-- v0.6.7 : titre et description repris dans l'aperçu des liens partagés (Teams, courriel, réseaux : balises Open Graph) -->
 <meta name="description" content="Visualisation moderne de l’inventaire des structures du MTMD au Québec, avec ma touche personnelle : profil LiDAR, données des cours d’eau, sismiques, etc. ! À partir de données publiques.">
 <meta property="og:type" content="website">
@@ -376,7 +376,7 @@ label{font-size:.875rem}
 .b3d-ax{padding:5px 8px;border-radius:6px;background:#f3f7f9;font-variant-numeric:tabular-nums}
 .b3d-foot{padding:8px 12px;border-top:1px solid var(--line);background:#f6f9fb;display:flex;flex-direction:column;gap:5px}
 .b3d-status{margin:0;padding:8px 12px;border-top:1px solid var(--line);font-size:.78rem;border-radius:0 0 11px 11px}
-.b3d-status.ok{background:#e4f6ef;color:#00473f}.b3d-status.err{background:#fde8e8;color:#7d0a22}.b3d-status.busy{background:#eef3f6}
+.b3d-ack span{white-space:nowrap;opacity:.7}.b3d-ack span.on{opacity:1;font-weight:600}.b3d-status.ok{background:#e4f6ef;color:#00473f}.b3d-status.err{background:#fde8e8;color:#7d0a22}.b3d-status.busy{background:#eef3f6}
 .b3d-banner{position:absolute;z-index:1001;left:50%;top:10px;transform:translateX(-50%);width:min(560px,calc(100% - 420px));min-width:260px;display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-radius:10px;background:#102d41ee;color:#fff;font-size:.78rem;line-height:1.4;box-shadow:0 6px 20px #102d4150}
 .b3d-banner button{flex:none;width:24px;height:24px;padding:0;border:0;background:transparent;color:#fff;font-size:1.1rem}
 .b3d-banner button:hover:not(:disabled){background:#ffffff26}
@@ -1071,7 +1071,7 @@ table.list tbody tr:hover{background:#eef5f7}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="data/structures.js"></script>
 <script src="data/details.js"></script>
-<script>window.PQ_META={"version": "0.7.2", "date": "2026-11-06", "author": "Anthony Chéruel"};</script>
+<script>window.PQ_META={"version": "0.7.3", "date": "2026-11-08", "author": "Anthony Chéruel"};</script>
 <script>
 (function(){
   'use strict';
@@ -2861,7 +2861,7 @@ table.list tbody tr:hover{background:#eef5f7}
     h += '<div class="dr-links">' + links.join('') + '<span class="dr-wiki" id="dr-wiki">' + wikiLinksHtml(o) + '</span>' + (o.lat != null ? '<button type="button" data-act="center">Centrer la carte</button>' +
       (lidarOk ? '<button type="button" class="ld-btn" data-act="lidar" title="Profils en long et en travers, hauteur sous l’ouvrage, relief ombré local (LiDAR 1 m de RNCan, calcul de quelques secondes)">Profil LiDAR</button>' : '') +
       // v0.7.2 : bloc de terrain (MNT/MNS, imagerie, zones) à envoyer à BridgeSketch 3D
-      '<button type="button" class="ld-btn" data-act="bloc3d" title="Extraire le relief LiDAR et l’imagerie autour de l’ouvrage (rectangle réglable) et l’envoyer à BridgeSketch 3D">Bloc 3D</button>' +
+      '<button type="button" class="ld-btn" data-act="bloc3d" title="Export vers Bridge Sketch 3D : extraire le relief LiDAR, l’imagerie et les zones autour de l’ouvrage (rectangle réglable), puis les envoyer à BridgeSketch 3D">Export vers BS3D</button>' +
       (o.obst === "Cours d'eau" ? '<button type="button" class="ld-btn" data-act="hydro" title="Bassin versant, zone inondable, niveaux et débits à la station la plus proche">Cours d’eau</button>' : '') +
       // v0.6.7 : fenêtre « Environnement » (prototype « Zones sensibles » intégré), pour tous les ouvrages
       '<button type="button" class="ld-btn" data-act="environnement" title="Aires protégées, habitats fauniques et floristiques, espèces en situation précaire, milieux humides, zones inondables et espèces envahissantes autour de l’ouvrage (1, 2 ou 5 km)">Environnement</button>' +
@@ -3146,7 +3146,7 @@ table.list tbody tr:hover{background:#eef5f7}
     var b = lcEl && lcEl.querySelector('.lc-b3d'); if (b) b.setAttribute('aria-pressed', 'true');
     loadScript('js/lidar.js').then(function(){ return loadScript('js/bloc3d-calc.js'); }).then(function(){ return loadScript('js/bloc3d.js'); }).then(function(){
       window.QA_MOD.bloc3d.open(map, o, opt || { bs3d: BS3D_MODE });
-    }).catch(function(){ alert('Module « Bloc 3D » indisponible (js/bloc3d.js).'); });
+    }).catch(function(){ alert('Module « Export vers Bridge Sketch 3D » indisponible (js/bloc3d.js).'); });
   }
   // Requête bornée dans le temps, lecture du corps comprise (audit v0.5.5 n° 7 : un serveur qui envoie les en-têtes
   // puis bloque le corps laissait la fenêtre en chargement). as = 'json' | 'arrayBuffer' | 'text' ; une réponse
@@ -4572,7 +4572,7 @@ table.list tbody tr:hover{background:#eef5f7}
           // v0.7.1 : maison (vue d'ensemble du sud du Québec, cadre de départ) sous « Masquer / Afficher » (demande)
           '<button type="button" class="lc-btn lc-home" aria-label="Vue d’ensemble du Québec" title="Vue d’ensemble du Québec"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3.2L2.6 11.4l1.3 1.5 1.6-1.4v9h5v-5.5h3v5.5h5v-9l1.6 1.4 1.3-1.5z" fill="currentColor"/></svg></button>' +
           // v0.7.2 : « Bloc 3D » (extraction du relief LiDAR vers BridgeSketch 3D), sous la maison
-          '<button type="button" class="lc-btn lc-b3d" aria-pressed="false" title="Bloc 3D pour BridgeSketch 3D : délimiter un rectangle, extraire le MNT/MNS 1 m, l’imagerie et les zones (eau, forêt, route), puis l’envoyer à BridgeSketch 3D"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.8 20 7v10l-8 4.2L4 17V7z"/><path d="M4 7l8 4.2L20 7M12 11.2v10"/></svg>Bloc 3D</button>' +
+          '<button type="button" class="lc-btn lc-b3d" aria-pressed="false" title="Export vers Bridge Sketch 3D : délimiter un rectangle, extraire le MNT/MNS 1 m, l’imagerie et les zones (eau, forêt, herbe, route), puis les envoyer à BridgeSketch 3D"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.8 20 7v10l-8 4.2L4 17V7z"/><path d="M4 7l8 4.2L20 7M12 11.2v10"/></svg>Export BS3D</button>' +
           '<div class="lc-panel" id="lc-panel" hidden><div class="lc-h">Fond de carte</div><div class="lc-fonds" role="radiogroup" aria-label="Fond de carte">' +
           FOND_ORDER.filter(function(n){ return FONDS[n]; }).map(function(n){
             return '<button type="button" role="radio" aria-checked="false" data-fond="' + esc(n) + '" title="' + esc(n) + '">' + esc(FOND_COURT[n] || n) + '</button>';

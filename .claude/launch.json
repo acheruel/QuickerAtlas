@@ -4,8 +4,24 @@
     {
       "name": "ponts-web",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8765",
+        "--bind",
+        "127.0.0.1"
+      ],
       "port": 8765
+    },
+    {
+      "name": "bs3d-dist",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "../BridgeSketch 3D/serve.mjs",
+        "../BridgeSketch 3D/dist",
+        "5175"
+      ],
+      "port": 5175
     }
   ]
 }

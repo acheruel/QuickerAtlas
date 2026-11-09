@@ -16,7 +16,7 @@ et y implante le pont. Ce document est la source de vérité des deux côtés (c
 {
   type: 'bs3d-terrain',
   version: 1,
-  source: 'QuickerAtlas v0.7.2',          // texte libre
+  source: 'QuickerAtlas v0.7.3',          // texte libre
   created: '2026-11-06T12:00:00Z',
   center: { lat: 46.81, lon: -71.21 },
   grid: {
@@ -28,9 +28,11 @@ et y implante le pont. Ce document est la source de vérité des deux côtés (c
   mnt: Float32Array | 'base64…',           // sol nu (obligatoire)
   mns: Float32Array | 'base64…' | null,    // surface (facultatif)
   image: { dataUrl: 'data:image/jpeg;base64,…', attribution: 'Esri World Imagery' } | null, // même emprise que la grille
-  zones: [                                 // modifiables par l'utilisateur dans QA avant l'envoi
-    { type: 'river' | 'water' | 'forest', source: 'osm' | 'auto' | 'user', polygon: [[x, y], …] },
-    { type: 'road', source: 'osm' | 'auto' | 'user', line: [[x, y], …], width: 7 },
+  zones: [                                 // modifiables dans QA avant l'envoi et dans BS3D après (0.6.9)
+    { type: 'river' | 'water' | 'forest' | 'grass', source: 'osm' | 'auto' | 'user', polygon: [[x, y], …],
+      level: 52.3 },                       // facultatif, eau seulement : cote absolue saisie dans BS3D (sinon estimée)
+    { type: 'road', source: 'osm' | 'auto' | 'user', line: [[x, y], …], width: 7,
+      lanes: 2, oneway: 1 | -1, bridge: true },  // facultatifs (OSM) : voies, sens unique (1 = sens du tracé), sur ouvrage
   ],
   bridge: {                                // axe du pont placé par l'utilisateur (2 clics) ou repris d'OSM / de la structure
     axis: [[x, y], [x, y]],                // culée ouest/début → culée est/fin, en m locaux
@@ -43,6 +45,11 @@ et y implante le pont. Ce document est la source de vérité des deux côtés (c
 Les grilles en base64 = octets d'un `Float32Array` little-endian. Fichier `.bs3dterrain` = ce JSON (grilles en base64),
 UTF-8, téléchargé par QA et ouvrable par BS3D (« IMPORT MNT/MNS » › Ouvrir un fichier).
 
+Ajouts compatibles de 2026-11-08 (QA v0.7.3, BS3D 0.6.9), toujours `version: 1` : type de zone `grass` (herbe / sol
+ouvert, OSM `landuse=grass|meadow|recreation_ground`, `natural=grassland`, `leisure=park`, ou tracé à la main),
+attributs facultatifs `level`, `lanes`, `oneway`, `bridge`. Un lecteur plus ancien ignore une zone `grass` et ces
+attributs ; il ne refuse pas le paquet.
+
 ## Transport
 
 1. **BS3D ouvre QA** : bouton « IMPORT MNT/MNS » → `window.open(QA_URL + '?bs3d=1')`. QA en mode `bs3d` affiche un
@@ -51,6 +58,12 @@ UTF-8, téléchargé par QA et ouvrable par BS3D (« IMPORT MNT/MNS » › Ouvri
 2. **QA seul** : bouton « Envoyer vers BridgeSketch 3D » → `w = window.open(BS3D_URL + '#terrain-import')` ; BS3D, au
    chargement avec ce hash, envoie `{ type: 'bs3d-ready' }` à `window.opener` ; QA répond par le paquet.
 3. **Fichier** : QA « Télécharger .bs3dterrain » ; BS3D « Ouvrir un fichier… ».
+
+**Accusé de réception (0.6.9)** : en `postMessage`, QA ajoute `transferId` (texte) au paquet. BS3D répond à la fenêtre
+émettrice, à son origine exacte : `{ type: 'bs3d-terrain-ack', id: transferId, state, … }` avec `state` =
+`'received'` (paquet valide, boîte ouverte ; `zones`, `axis`), `'applied'` (site et pont en place), `'closed'` (boîte
+fermée sans appliquer) ou `'error'` (`message`). QA n'écoute que la fenêtre destinataire et l'identifiant du transfert ;
+sans réponse en 15 s, il l'indique (ancienne version de BS3D) sans bloquer.
 
 BS3D accepte un message seulement si `event.origin` est `https://acheruel.github.io` ou un hôte local
 (`localhost`, `127.0.0.1`) et si `data.type === 'bs3d-terrain' && data.version === 1`.
@@ -61,8 +74,18 @@ en local, chaque appli lit un remplacement dans `localStorage` (`bs3d-qa-url`, `
 
 - Le terrain importé est une **surcouche de session** : il n'entre ni dans le lien partagé ni dans le JSON du pont ; il
   est gardé dans IndexedDB pour survivre au rechargement. Par défaut, terrain procédural et 8 exemples inchangés.
+- **Projet complet (0.6.9)** : Fichier › « Save complete project » écrit un `.bs3dproject` =
+  `{ format: 'bs3d-project', formatVersion: 1, release, name, config, camera, placement, terrain }` où `terrain` est ce
+  paquet (grilles en base64, zones corrigées comprises) et `config` la configuration du pont A avec `twin` (pont B).
+  Fichier › Ouvrir le relit sur un navigateur vierge. Le `.bs3dterrain` autonome reste lisible.
+- **Pont neutre (0.6.9)** : au premier transfert, la boîte propose un pont neutre (travées égales sur la longueur de
+  l'axe, 8 au plus) ; travées, largeur, tablier, biais, pente, altitude et approches se règlent avant « Créer le pont sur
+  ce site ». « Reprendre mon pont actuel » garde le pont en cours.
+- **Pont B (0.6.9)** : `config.twin` = second pont indépendant sur le même site (entraxe, décalage, rotation, largeur,
+  travées, tablier, biais, pente, altitude propres). Les deux ponts partagent terrain, eau, routes et lumière.
 - Placement : l'axe `bridge.axis` est aligné sur l'axe du pont (centre de l'axe = milieu du pont, rotation = azimut de
   l'axe). Ajustements dans la boîte d'import : glisser / tourner / décalage vertical (auto : le profil du pont rejoint le
   MNT aux deux culées).
-- Le corridor du pont et de ses approches (remblais, cônes 2H:1V, talus) remplace le MNT localement ; le MNT reste
-  ailleurs.
+- Depuis 0.6.9, seules les **approches** (remblais, cônes 2H:1V, déblais) modifient le MNT. Entre les culées, le relief
+  mesuré est conservé : un conflit avec le tablier est signalé dans la boîte d'import (relever le profil), jamais
+  « résolu » en creusant une vallée.
