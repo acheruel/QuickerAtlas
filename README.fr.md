@@ -35,13 +35,13 @@ plus rapide à explorer.
   humides, zones inondables et espèces envahissantes à 1, 2 ou 5 km), aléa sismique du code national du bâtiment.
   **Climat futur** : températures et précipitations passées et futures à l’ouvrage (scénarios CMIP6 d’ECCC, référence
   1971-2000 ou 2021-2050).
-- **Export vers Bridge Sketch 3D** (v0.7.2, v0.7.3) : le bouton **Export BS3D** (sous « Couches » ou dans une fiche)
-  permet de tracer un rectangle de 1,5 km au plus, d’en extraire le relief LiDAR 1 m (sol et surface), l’image satellite
-  et l’eau, les forêts, l’herbe et les routes d’OpenStreetMap (voies et sens unique conservés), de repérer cours d’eau,
-  forêts et routes d’après les couleurs de l’image (zones regroupées par famille, à corriger, supprimer ou ajouter, herbe
-  comprise ; axe du pont à placer), puis d’envoyer le bloc à BridgeSketch 3D, qui confirme chaque étape (envoyé → reçu
-  et validé → appliqué), ou d’en faire un fichier `.bs3dterrain` (format : [docs/bs3d-terrain-v1.md](docs/bs3d-terrain-v1.md)).
-  Le pont et les corrections de zones suivantes se règlent dans BridgeSketch 3D.
+- **Export 3D** (v0.7.2, refait en v0.7.4) : l’onglet **Export 3D**, à droite de « Ponts remarquables », a sa propre carte
+  satellite. On choisit un ouvrage (n°, ou clic sur la carte) et un bloc de 1,5 km au plus ; en 5 secondes environ,
+  QuickerAtlas extrait le relief LiDAR 1 m (sol et surface), l’image satellite et les routes (CanVec de RNCan), et repère
+  peu de zones, mais justes : eau et forêt par le LiDAR (avec la cote de l’eau), herbe par l’image. Les zones se corrigent
+  sur la carte : clic ou Maj + clic, Maj + glisser pour en encadrer plusieurs, glisser pour déplacer, Suppr, Ctrl + Z.
+  Le pont existant est retiré du relief (sol continu dessous). Le bloc part vers BridgeSketch 3D, qui confirme chaque
+  étape, ou dans un fichier `.bs3dterrain` (format : [docs/bs3d-terrain-v1.md](docs/bs3d-terrain-v1.md)).
 
 Chaque vue garde ses filtres dans l’adresse : copiez le lien pour partager exactement ce que vous voyez.
 

@@ -16,7 +16,7 @@ et y implante le pont. Ce document est la source de vérité des deux côtés (c
 {
   type: 'bs3d-terrain',
   version: 1,
-  source: 'QuickerAtlas v0.7.3',          // texte libre
+  source: 'QuickerAtlas v0.7.4',          // texte libre
   created: '2026-11-06T12:00:00Z',
   center: { lat: 46.81, lon: -71.21 },
   grid: {
@@ -30,7 +30,7 @@ et y implante le pont. Ce document est la source de vérité des deux côtés (c
   image: { dataUrl: 'data:image/jpeg;base64,…', attribution: 'Esri World Imagery' } | null, // même emprise que la grille
   zones: [                                 // modifiables dans QA avant l'envoi et dans BS3D après (0.6.9)
     { type: 'river' | 'water' | 'forest' | 'grass', source: 'osm' | 'auto' | 'user', polygon: [[x, y], …],
-      level: 52.3 },                       // facultatif, eau seulement : cote absolue saisie dans BS3D (sinon estimée)
+      level: 52.3 },                       // facultatif, eau seulement : cote absolue lue dans le MNT par QA ou saisie (sinon estimée par BS3D)
     { type: 'road', source: 'osm' | 'auto' | 'user', line: [[x, y], …], width: 7,
       lanes: 2, oneway: 1 | -1, bridge: true },  // facultatifs (OSM) : voies, sens unique (1 = sens du tracé), sur ouvrage
   ],
@@ -49,6 +49,12 @@ Ajouts compatibles de 2026-11-08 (QA v0.7.3, BS3D 0.6.9), toujours `version: 1` 
 ouvert, OSM `landuse=grass|meadow|recreation_ground`, `natural=grassland`, `leisure=park`, ou tracé à la main),
 attributs facultatifs `level`, `lanes`, `oneway`, `bridge`. Un lecteur plus ancien ignore une zone `grass` et ces
 attributs ; il ne refuse pas le paquet.
+
+Ajouts compatibles de 2026-11-10 (QA v0.7.4, BS3D 0.7.0), toujours `version: 1` : QA n'interroge plus OpenStreetMap ; ses
+zones portent `source: 'auto'` (eau et forêt détectées par le LiDAR, herbe par la couleur, routes du masque CanVec de RNCan) ou
+`'user'`. Les zones d'eau détectées portent leur cote `level`, lue dans le MNT. Si un axe de pont est fourni, QA retire le pont
+existant des grilles : dans le couloir du tablier, le MNT est interpolé d'un bord à l'autre et le MNS ramené au sol. `'osm'`
+reste une valeur acceptée de `source` (fichiers plus anciens) ; `lanes`, `oneway` et `bridge` restent facultatifs.
 
 ## Transport
 

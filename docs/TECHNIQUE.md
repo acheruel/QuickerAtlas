@@ -132,28 +132,38 @@ officiel en v0.7.1) et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR »,
 contrat `window.QA_MOD.lidar.open(o)`) ne sont chargés qu'à la première ouverture. Contrat : `window.QA_MOD[clé].render(o, body, ctx)` ; la page leur
 prête `window.QA` (échappement, formats, `fetchT` borné dans le temps corps compris, `loadScript`, `distM`, `det`).
 
-**Export vers Bridge Sketch 3D** (v0.7.2, nom depuis v0.7.3 ; bouton « Export BS3D ») : `js/bloc3d.js` (interface : rectangle,
-extraction, zones modifiables regroupées par famille, axe du pont, envoi avec accusé de réception), `js/bloc3d-calc.js` (fonctions pures, sans DOM ni réseau, testées par `tests/js/bloc3d_calc.mjs`) et `js/lidar.js`
+**Export 3D vers BridgeSketch 3D** (v0.7.2 ; onglet « Export 3D » depuis v0.7.4, à droite de « Ponts remarquables ») :
+`js/bloc3d.js` (interface : sa propre carte satellite Leaflet dans `#view-export3d`, volet à droite, barre d'outils sur la
+carte), `js/bloc3d-calc.js` (fonctions pures, sans DOM ni réseau, testées par `tests/js/bloc3d_calc.mjs`) et `js/lidar.js`
 (GeoTIFF, WCS et Esri, exposés par `QA_MOD.lidar._geo` : `wcsBox(kind, bb, step, ms)`, `imgBox(bb, nw, nh, ms)`) sont chargés
-à la première ouverture du bouton « Export BS3D » (panneau des couches ou fiche). v0.7.3 : zones `grass` (OSM
-`landuse=grass|meadow|recreation_ground`, `natural=grassland`, `leisure=park`, ou tracées à la main) ; routes avec `lanes`,
-`oneway`, `bridge` ; `transferId` dans le message et écoute de `bs3d-terrain-ack` (états reçu / appliqué / fermé / erreur,
-15 s sans réponse = ancienne version de BS3D) ; le pont lui-même se paramètre dans BS3D (pont neutre, pont B). Le paquet `bs3d-terrain` v1 est décrit dans
-[bs3d-terrain-v1.md](bs3d-terrain-v1.md) (copie du contrat partagé avec BridgeSketch 3D).
+à la première ouverture de l'onglet (ou du bouton « Export 3D » d'une fiche). Contrat : `QA_MOD.bloc3d.show(vue, structure,
+{ bs3d, center, zoom })` ; la page prête `QA.all()` (les structures, pour les ronds cliquables de la carte). Le paquet
+`bs3d-terrain` v1 est décrit dans [bs3d-terrain-v1.md](bs3d-terrain-v1.md) (contrat partagé avec BridgeSketch 3D).
 - **Repère** : grille locale centrée sur le bloc, x vers l'est, y vers le nord, mètres au sol (Mercator × cos φ), ligne 0 au
   nord ; pas de 1 m jusqu'à 1,5 M de cellules, sinon 2 m ; côté ≤ 1 500 m.
-- **Extraction** : MNT puis MNS du WCS de RNCan (`GridOffsets` = pas voulu en Mercator ; sans lui le serveur sert ≈ 1,94 m
-  Mercator par pixel, soit ≈ 1,3 m au sol), un seul GeoTIFF par grille (1 224 × 1 224 pixels répondent en 3 s ; pas de
-  tuiles nécessaires jusqu'à 1,5 km), deux requêtes WCS espacées de 1,2 s, avec 3 essais comme le profil LiDAR ; export
-  Esri sur l'emprise exacte de la grille (≤ 2 048 px, ≥ 0,5 m/pixel) ; Overpass (eau, cours d'eau, forêts, routes, ponts :
-  40 s sur le serveur principal, 2 miroirs de repli à 12 s, bouton « Continuer sans OpenStreetMap »).
-- **Détection** (`detect`) : image agrégée sur une grille de 2 m (3 m au-delà de 1 km) ; pour chaque cellule, couleur moyenne,
-  texture (écart-type de la luminance), hauteur MNS − MNT et part de MNT sans donnée ; classes `classifyCell` (eau : bleutée ou
-  très sombre, lisse, au ras du sol, ou sans retour LiDAR ; forêt : vert sombre avec canopée ≥ 2,5 m, ou texture forte sans MNS ;
-  route : gris peu saturé, lisse, ni toit ni arbre) ; majorité 3 × 3 ; les zones OSM l'emportent (cellules déjà couvertes retirées
-  de la détection, par type) ; eau et forêt : fermeture, composantes, contour extérieur, Douglas-Peucker (0,9 cellule) ;
-  routes : ouverture, retrait des surfaces de plus de 28 m de large, squelette de Zhang-Suen, plus long chemin (branches
-  reprises), largeur par transformée en distance. Les trous des polygones sont ignorés (un seul anneau par zone).
+- **Extraction** (≈ 5 à 10 s) : MNT puis MNS du WCS de RNCan (`GridOffsets` = pas voulu en Mercator), deux requêtes espacées
+  de 1 s ; export Esri sur l'emprise exacte de la grille (≤ 2 048 px) ; masque des routes = une image PNG transparente du WMS
+  CanVec de RNCan (`maps.geogratis.gc.ca/wms/canvec_en`, couche `road_segment_50k`, ≈ 1 m par pixel, CORS ouvert, licence du
+  gouvernement ouvert – Canada). **Plus d'OpenStreetMap depuis v0.7.4** (Overpass : 30 à 60 s, souvent en échec, et trop de
+  petites zones à supprimer).
+- **Détection** (`detect`, grille de 2 m, 3 m au-delà de 1 km ; ≈ 0,3 s) : peu de zones, mais justes.
+  Eau = cellules planes du MNT (moins de 3 cm d'écart sur 3 × 3 m ; le MNEHR aplanit les plans d'eau) ou couleur d'eau ;
+  chaque composante est étendue aux cellules voisines à la même cote (sous un tablier, sous des branches), puis gardée si elle
+  est étale (moins de 8 cm d'écart) ou plus basse que ses rives d'au moins 25 cm, ou de couleur franche ; un petit plan d'eau
+  (< 3 000 m²) exige en plus la couleur ou une rive de 40 cm. La cote (médiane du MNT) part dans `level`. « Cours d'eau » si la
+  zone touche deux bords du bloc (ou un bord, et allongée). Forêt = canopée ≥ 3 m (MNS − MNT), verte ou rugueuse (un toit est
+  lisse) ; les 10 plus grandes, ≥ 1 500 m². Herbe = vert au ras du sol ; les 4 plus grandes, ≥ 4 000 m². Routes
+  (`roadsFromMask`) : squelette de Zhang-Suen du masque, coupe aux carrefours (nombre de branches autour du pixel), raccord
+  des tronçons qui se prolongent (< 35°), largeur selon l'épaisseur du trait (11, 8 ou 6,5 m), ≥ 25 m. Contours : anneau
+  extérieur seul, Douglas-Peucker.
+- **Axe proposé** : direction de la route la plus proche de la structure (`suggestAxis`) ; les deux bouts sont lus dans le
+  MNS (`deckExtent` : surface ≥ 1,5 m au-dessus du sol), retenus s'ils sont cohérents avec la longueur connue de l'ouvrage.
+- **Pont existant retiré** (`removeBridge`, à la construction du paquet, case cochée par défaut) : dans le couloir du tablier
+  (axe, largeur de l'ouvrage + 2 m de chaque côté), le MNT est interpolé d'un bord à l'autre là où il dépasse ce sol de 30 cm,
+  et le MNS prend la valeur du sol.
+- **Édition** : sélection = tableau d'identifiants ; clic, Ctrl + clic, Maj + glisser ou « Cadre de sélection » ; glisser une
+  zone choisie déplace toute la sélection (bornée au bloc) ; Suppr, Ctrl + Z (40 instantanés JSON), Ctrl + A ; sommets pour
+  une seule zone choisie.
 - **Envoi** : mode `?bs3d=1` (ouvert par BridgeSketch 3D) → `window.opener.postMessage(paquet, '*', transférables)` ; sinon
   `window.open(BS3D_URL + '#terrain-import')`, attente de `{ type: 'bs3d-ready' }` (60 s), puis envoi ; `BS3D_URL` peut être
   remplacée par `localStorage['qa-bs3d-url']`. « Télécharger .bs3dterrain » = JSON avec grilles en base64. Aucune donnée n'est

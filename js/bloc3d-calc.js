@@ -7,7 +7,7 @@
 (function(root){
   'use strict';
   var R = 6378137, MAX_CELLS = 1500000, MAX_SIDE = 1500;
-  var B = { R: R, MAX_CELLS: MAX_CELLS, MAX_SIDE: MAX_SIDE, SOURCE: 'QuickerAtlas v0.7.3' };
+  var B = { R: R, MAX_CELLS: MAX_CELLS, MAX_SIDE: MAX_SIDE, SOURCE: 'QuickerAtlas v0.7.4' };
 
   // ---------- Repère ----------
   B.merc = function(lat, lon){ return [lon * Math.PI / 180 * R, Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * R]; };
@@ -100,7 +100,11 @@
           if (z.oneway === 1 || z.oneway === -1) q.oneway = z.oneway;
           if (z.bridge) q.bridge = true;
         }
-        else q.polygon = z.polygon.map(function(p){ return [p[0], p[1]]; });
+        else {
+          q.polygon = z.polygon.map(function(p){ return [p[0], p[1]]; });
+          // v0.7.4 : cote du plan d'eau lue dans le MNT (m, même référence que la grille)
+          if ((z.type === 'water' || z.type === 'river') && typeof z.level === 'number' && isFinite(z.level)) q.level = z.level;
+        }
         return q;
       }),
       bridge: o.bridge ? { axis: [[o.bridge.axis[0][0], o.bridge.axis[0][1]], [o.bridge.axis[1][0], o.bridge.axis[1][1]]], structure: o.bridge.structure || null } : null,
@@ -239,42 +243,6 @@
     if (cur && cur.length > 1) out.push(cur);
     return out;
   };
-  // Polygone autour d'une ligne (demi-largeur hw) : décalages gauche / droite aux sommets (onglets limités)
-  B.bufferLine = function(line, hw){
-    var n = line.length, L = [], Rr = [], i;
-    for (i = 0; i < n; i++) {
-      var a = line[Math.max(0, i - 1)], b = line[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1;
-      var p = line[i], nx = -dy / d, ny = dx / d, m = 1;
-      if (i > 0 && i < n - 1) {
-        var u1x = p[0] - line[i - 1][0], u1y = p[1] - line[i - 1][1], u2x = line[i + 1][0] - p[0], u2y = line[i + 1][1] - p[1], l1 = Math.hypot(u1x, u1y) || 1, l2 = Math.hypot(u2x, u2y) || 1;
-        var c = (u1x * u2x + u1y * u2y) / (l1 * l2);
-        m = Math.min(2, 1 / Math.max(0.5, Math.sqrt((1 + c) / 2)));
-      }
-      L.push([p[0] + nx * hw * m, p[1] + ny * hw * m]); Rr.push([p[0] - nx * hw * m, p[1] - ny * hw * m]);
-    }
-    return L.concat(Rr.reverse());
-  };
-  // Assemble des segments (listes de points) en anneaux fermés en joignant les extrémités identiques
-  B.stitchRings = function(segs){
-    var key = function(p){ return p[0].toFixed(7) + ',' + p[1].toFixed(7); }, rest = segs.filter(function(s){ return s.length > 1; }).map(function(s){ return s.slice(); }), rings = [];
-    while (rest.length) {
-      var cur = rest.pop(), grew = true;
-      while (grew && key(cur[0]) !== key(cur[cur.length - 1])) {
-        grew = false;
-        for (var i = 0; i < rest.length; i++) {
-          var s = rest[i], e = key(cur[cur.length - 1]);
-          if (key(s[0]) === e) { cur = cur.concat(s.slice(1)); rest.splice(i, 1); grew = true; break; }
-          if (key(s[s.length - 1]) === e) { cur = cur.concat(s.slice(0, -1).reverse()); rest.splice(i, 1); grew = true; break; }
-          var b = key(cur[0]);
-          if (key(s[s.length - 1]) === b) { cur = s.concat(cur.slice(1)); rest.splice(i, 1); grew = true; break; }
-          if (key(s[0]) === b) { cur = s.slice().reverse().concat(cur.slice(1)); rest.splice(i, 1); grew = true; break; }
-        }
-      }
-      if (cur.length >= 4 && key(cur[0]) === key(cur[cur.length - 1])) rings.push(cur.slice(0, -1));
-    }
-    return rings;
-  };
-
   // ---------- Relief ombré (aperçu 2D du MNT) ----------
   // Horn, soleil du nord-ouest. Sous-échantillonne à ≤ maxSide pixels. Renvoie { w, h, gray (Uint8ClampedArray), zmin, zmax }.
   B.hillshade = function(z, cols, rows, cell, maxSide){
@@ -319,21 +287,10 @@
     return K.OTHER;
   };
 
-  // Majorité 3 × 3 (une cellule change de classe si au moins 5 voisines sur 9 en ont une autre)
-  function modeFilter(cls, w, h){
-    var out = new Uint8Array(cls.length), cnt = [0, 0, 0, 0];
-    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
-      cnt[0] = cnt[1] = cnt[2] = cnt[3] = 0;
-      for (var j = Math.max(0, y - 1); j <= Math.min(h - 1, y + 1); j++) for (var i = Math.max(0, x - 1); i <= Math.min(w - 1, x + 1); i++) cnt[cls[j * w + i]]++;
-      var best = cls[y * w + x];
-      for (var k = 0; k < 4; k++) if (cnt[k] >= 5) best = k;
-      out[y * w + x] = best;
-    }
-    return out;
-  }
+  // Érosion 4-voisins ; hors de la grille compte comme plein (une zone qui touche le bord du bloc ne rétrécit pas)
   function erode(m, w, h){
     var o = new Uint8Array(m.length);
-    for (var y = 1; y < h - 1; y++) for (var x = 1; x < w - 1; x++) { var i = y * w + x; o[i] = m[i] && m[i - 1] && m[i + 1] && m[i - w] && m[i + w] ? 1 : 0; }
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) { var i = y * w + x; o[i] = m[i] && (x === 0 || m[i - 1]) && (x === w - 1 || m[i + 1]) && (y === 0 || m[i - w]) && (y === h - 1 || m[i + w]) ? 1 : 0; }
     return o;
   }
   function dilate(m, w, h){
@@ -398,312 +355,302 @@
     }
     return a;
   }
-  // Transformée en distance (chanfrein 1 / √2), en cellules
-  function distTransform(m, w, h){
-    var d = new Float32Array(m.length), INF = 1e9, i, x, y, S = Math.SQRT2;
-    for (i = 0; i < m.length; i++) d[i] = m[i] ? INF : 0;
-    for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
-      i = y * w + x; if (!d[i]) continue;
-      var v = d[i];
-      v = Math.min(v, x > 0 ? d[i - 1] + 1 : 1, y > 0 ? d[i - w] + 1 : 1, x > 0 && y > 0 ? d[i - w - 1] + S : 1, x < w - 1 && y > 0 ? d[i - w + 1] + S : 1);
-      d[i] = v;
-    }
-    for (y = h - 1; y >= 0; y--) for (x = w - 1; x >= 0; x--) {
-      i = y * w + x; if (!d[i]) continue;
-      var u = d[i];
-      u = Math.min(u, x < w - 1 ? d[i + 1] + 1 : 1, y < h - 1 ? d[i + w] + 1 : 1, x < w - 1 && y < h - 1 ? d[i + w + 1] + S : 1, x > 0 && y < h - 1 ? d[i + w - 1] + S : 1);
-      d[i] = u;
-    }
-    return d;
-  }
-  var N8 = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
-  // Plus long chemin d'un squelette (double parcours en largeur) parmi les pixels `alive` connexes à `seed` ; { path (indices), len (cellules) }
-  function longestPath(sk, alive, w, h, seed){
-    var bfs = function(src){
-      var par = new Map(), dist = new Map(), q = [src], qi = 0, far = src;
-      par.set(src, -1); dist.set(src, 0);
-      while (qi < q.length) {
-        var p = q[qi++], x = p % w, y = (p - x) / w;
-        for (var k = 0; k < 8; k++) {
-          var nx = x + N8[k][0], ny = y + N8[k][1];
-          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-          var n = ny * w + nx;
-          if (!sk[n] || !alive[n] || par.has(n)) continue;
-          par.set(n, p); dist.set(n, dist.get(p) + (k === 0 || k === 2 || k === 5 || k === 7 ? Math.SQRT2 : 1)); q.push(n);
-          if (dist.get(n) > dist.get(far)) far = n;
-        }
-      }
-      return { far: far, par: par, dist: dist.get(far), seen: q };
-    };
-    var a = bfs(seed), b = bfs(a.far), path = [], p = b.far;
-    while (p !== -1) { path.push(p); p = b.par.get(p); }
-    return { path: path.reverse(), len: b.dist, seen: a.seen };
-  }
-  // Lignes centrales d'un masque de routes : [{ line: [[x, y]…] en coordonnées de cellule (centre), width (cellules), len (cellules) }].
-  // Plus long chemin du squelette, retiré avec son voisinage ; les branches restantes sont reprises tant qu'elles font minLen m.
-  function centerlines(m, w, h, cell, opt){
-    var sk = thin(m, w, h), dt = distTransform(m, w, h), alive = new Uint8Array(sk), out = [], guard = 0, minLen = opt.minLen / cell;
-    for (var i0 = 0; i0 < sk.length && guard < 200; i0++) {
-      if (!sk[i0] || !alive[i0]) continue;
-      guard++;
-      var lp = longestPath(sk, alive, w, h, i0);
-      if (lp.len < minLen) { lp.seen.forEach(function(s){ alive[s] = 0; }); continue; }       // groupe trop court : écarté en entier
-      lp.path.forEach(function(p){
-        var x = p % w, y = (p - x) / w;
-        for (var j = -1; j <= 1; j++) for (var i = -1; i <= 1; i++) { var nx = x + i, ny = y + j; if (nx >= 0 && ny >= 0 && nx < w && ny < h) alive[ny * w + nx] = 0; }
-      });
-      var ws = lp.path.map(function(p){ return dt[p]; }).sort(function(a, b){ return a - b; });
-      out.push({ line: lp.path.map(function(p){ var x = p % w; return [x + 0.5, (p - x) / w + 0.5]; }), width: 2 * ws[ws.length >> 1] - 1, len: lp.len });
-      i0 = -1;                                    // reprise du balayage : d'autres branches peuvent rester
-    }
-    return out;
-  }
-
-  // ---------- Rasterisation (masques OSM sur la grille de détection) ----------
-  // G = { xmin, ymax, dc, cols, rows }
-  function rasterPoly(mask, poly, G){
-    var n = poly.length;
-    for (var r = 0; r < G.rows; r++) {
-      var y = G.ymax - (r + 0.5) * G.dc, xs = [];
-      for (var i = 0, j = n - 1; i < n; j = i++) {
-        var a = poly[i], b = poly[j];
-        if ((a[1] > y) !== (b[1] > y)) xs.push((b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]);
-      }
-      xs.sort(function(p, q){ return p - q; });
-      for (var k = 0; k + 1 < xs.length; k += 2) {
-        var c0 = Math.max(0, Math.ceil((xs[k] - G.xmin) / G.dc - 0.5)), c1 = Math.min(G.cols - 1, Math.floor((xs[k + 1] - G.xmin) / G.dc - 0.5));
-        for (var c = c0; c <= c1; c++) mask[r * G.cols + c] = 1;
-      }
-    }
-  }
-  function rasterLine(mask, line, width, G){
-    var hw = width / 2 + G.dc * 0.75, h2 = hw * hw;
-    for (var s = 0; s + 1 < line.length; s++) {
-      var a = line[s], b = line[s + 1];
-      var c0 = Math.max(0, Math.floor((Math.min(a[0], b[0]) - hw - G.xmin) / G.dc)), c1 = Math.min(G.cols - 1, Math.ceil((Math.max(a[0], b[0]) + hw - G.xmin) / G.dc));
-      var r0 = Math.max(0, Math.floor((G.ymax - Math.max(a[1], b[1]) - hw) / G.dc)), r1 = Math.min(G.rows - 1, Math.ceil((G.ymax - Math.min(a[1], b[1]) + hw) / G.dc));
-      for (var r = r0; r <= r1; r++) for (var c = c0; c <= c1; c++) {
-        if (segD2([G.xmin + (c + 0.5) * G.dc, G.ymax - (r + 0.5) * G.dc], a, b) <= h2) mask[r * G.cols + c] = 1;
-      }
-    }
-  }
-
-  // ---------- Détection ----------
-  // o = { grid (du paquet), img: { px (RGBA), w, h } | null, mnt, mns|null, osm: { zones[] } | null, opt? }
-  // L'image couvre l'emprise de la grille (bords des cellules). Renvoie { zones, dc, stats, cls (carte de classes), G }.
+  // ---------- Détection (v0.7.4 : LiDAR d'abord, sans OpenStreetMap) ----------
+  // Principe : peu de zones, mais justes, plutôt que beaucoup de petites à supprimer.
+  //   eau    = surface plane du MNT (le MNEHR aplanit les plans d'eau), plus basse que ses rives, ou couleur d'eau de l'imagerie ;
+  //            la cote du plan d'eau (médiane du MNT) part avec la zone ;
+  //   forêt  = canopée d'au moins 3 m (MNS − MNT), verte ou rugueuse (un toit est lisse) ;
+  //   herbe  = vert, au ras du sol ;
+  //   routes = lignes centrales du masque CanVec de RNCan (B.roadsFromMask), une requête d'image d'environ 1 s.
+  // o = { grid (du paquet), img: { px (RGBA), w, h } | null, mnt, mns | null, roads: { px (RGBA), w, h } | null, dc? }
+  // L'image et le masque couvrent l'emprise de la grille (bords des cellules). Renvoie { zones, dc, stats, G }.
+  B.LIMITS = { water: 300, forest: 1500, grass: 4000, maxForest: 10, maxGrass: 4, roadMin: 25 };
+  function median(a){ if (!a.length) return NaN; a.sort(function(p, q){ return p - q; }); return a[a.length >> 1]; }
+  function repeat(f, m, w, h, n){ for (var i = 0; i < n; i++) m = f(m, w, h); return m; }
   B.detect = function(o){
     var g = o.grid, W = g.cols * g.cell, H = g.rows * g.cell, xmin = g.x0 - g.cell / 2, ymax = g.y0 + g.cell / 2, ymin = ymax - H;
-    var dc = o.dc || (Math.max(W, H) > 1000 ? 3 : 2), cols = Math.ceil(W / dc), rows = Math.ceil(H / dc), N = cols * rows;
+    var dc = o.dc || (Math.max(W, H) > 1000 ? 3 : 2), cols = Math.ceil(W / dc), rows = Math.ceil(H / dc), N = cols * rows, LIM = B.LIMITS;
     var G = { xmin: xmin, ymax: ymax, dc: dc, cols: cols, rows: rows };
-    var cls = new Uint8Array(N), i, x, y;
-    var stats = { dc: dc, cols: cols, rows: rows, water: 0, forest: 0, road: 0, osmCovered: 0 };
-    if (o.img) {
-      var im = o.img, nn = new Float32Array(N), sr = new Float32Array(N), sg = new Float32Array(N), sb = new Float32Array(N), sl = new Float32Array(N), sl2 = new Float32Array(N);
-      for (y = 0; y < im.h; y++) {
-        var cy = Math.min(rows - 1, Math.floor(y * H / im.h / dc));
-        for (x = 0; x < im.w; x++) {
-          var cx = Math.min(cols - 1, Math.floor(x * W / im.w / dc)), p = (y * im.w + x) * 4, ci = cy * cols + cx, R_ = im.px[p], G_ = im.px[p + 1], B_ = im.px[p + 2], l = 0.299 * R_ + 0.587 * G_ + 0.114 * B_;
-          nn[ci]++; sr[ci] += R_; sg[ci] += G_; sb[ci] += B_; sl[ci] += l; sl2[ci] += l * l;
-        }
+    var stats = { dc: dc, cols: cols, rows: rows, water: 0, river: 0, forest: 0, grass: 0, road: 0 };
+    var i, x, y, im = o.img, mnt = o.mnt, mns = o.mns;
+    // couleur moyenne et texture par cellule de détection
+    var nn = new Float32Array(N), sr = new Float32Array(N), sg = new Float32Array(N), sb = new Float32Array(N), sl = new Float32Array(N), sl2 = new Float32Array(N);
+    if (im) for (y = 0; y < im.h; y++) {
+      var cy = Math.min(rows - 1, Math.floor(y * H / im.h / dc));
+      for (x = 0; x < im.w; x++) {
+        var p = (y * im.w + x) * 4, ci = cy * cols + Math.min(cols - 1, Math.floor(x * W / im.w / dc)), R_ = im.px[p], G_ = im.px[p + 1], B_ = im.px[p + 2], l = 0.299 * R_ + 0.587 * G_ + 0.114 * B_;
+        nn[ci]++; sr[ci] += R_; sg[ci] += G_; sb[ci] += B_; sl[ci] += l; sl2[ci] += l * l;
       }
-      var chmS = null, chmN = null, nanN = new Float32Array(N), gN = new Float32Array(N);
-      if (o.mns) { chmS = new Float32Array(N); chmN = new Float32Array(N); }
-      var sub = Math.max(1, Math.floor(dc / g.cell));
-      for (y = 0; y < g.rows; y += sub) {
-        var dy = Math.min(rows - 1, Math.floor(y * g.cell / dc));
-        for (x = 0; x < g.cols; x += sub) {
-          var dx = Math.min(cols - 1, Math.floor(x * g.cell / dc)), gi = y * g.cols + x, di = dy * cols + dx;
-          gN[di]++;
-          if (!isFinite(o.mnt[gi])) nanN[di]++;
-          else if (o.mns && isFinite(o.mns[gi])) { chmS[di] += o.mns[gi] - o.mnt[gi]; chmN[di]++; }
-        }
-      }
-      for (i = 0; i < N; i++) {
-        if (nn[i] < 1) continue;
-        var m = sl[i] / nn[i], tex = Math.sqrt(Math.max(0, sl2[i] / nn[i] - m * m));
-        cls[i] = B.classifyCell({ r: sr[i] / nn[i], g: sg[i] / nn[i], b: sb[i] / nn[i], tex: tex, chm: chmN && chmN[i] > 0 ? chmS[i] / chmN[i] : null, nan: gN[i] ? nanN[i] / gN[i] : 0 });
-      }
-      cls = modeFilter(cls, cols, rows);
     }
-    // Zones OSM : elles l'emportent là où elles existent (les cellules qu'elles couvrent sont retirées de la détection)
-    var osmM = { water: new Uint8Array(N), forest: new Uint8Array(N), road: new Uint8Array(N) }, osmZ = (o.osm && o.osm.zones) || [];
-    osmZ.forEach(function(z){
-      if (z.type === 'grass') return;
-      if (z.type === 'road') rasterLine(osmM.road, z.line, (z.width || 7) + 2, G);
-      else rasterPoly(osmM[z.type === 'forest' ? 'forest' : 'water'], z.polygon, G);
-    });
+    // LiDAR par cellule de détection : altitude moyenne, hauteur de canopée (moyenne, écart-type), part de cellules planes, part sans donnée
+    var zS = new Float32Array(N), zN = new Float32Array(N), cS = new Float32Array(N), cS2 = new Float32Array(N), cN = new Float32Array(N), fN = new Float32Array(N), gN = new Float32Array(N), nanN = new Float32Array(N);
+    var gc = g.cols, gr = g.rows, flatTol = 0.03 * g.cell;
+    for (y = 0; y < gr; y++) {
+      var dy = Math.min(rows - 1, Math.floor(y * g.cell / dc));
+      for (x = 0; x < gc; x++) {
+        var gi = y * gc + x, di = dy * cols + Math.min(cols - 1, Math.floor(x * g.cell / dc)), z = mnt[gi];
+        gN[di]++;
+        if (!(z === z)) { nanN[di]++; continue; }
+        zS[di] += z; zN[di]++;
+        if (mns) { var sv = mns[gi]; if (sv === sv) { var c = sv - z; cS[di] += c; cS2[di] += c * c; cN[di]++; } }
+        if (x > 0 && y > 0 && x < gc - 1 && y < gr - 1) {         // plane : moins de 3 cm d'écart sur le voisinage 3 × 3
+          var lo = z, hi = z, v;
+          for (var j = -1; j <= 1; j++) for (var k = -1; k <= 1; k++) { v = mnt[gi + j * gc + k]; if (v < lo) lo = v; else if (v > hi) hi = v; else if (!(v === v)) hi = Infinity; }
+          if (hi - lo < flatTol) fN[di]++;
+        }
+      }
+    }
+    var mW = new Uint8Array(N), mF = new Uint8Array(N), mG = new Uint8Array(N), colW = new Uint8Array(N), zc = new Float32Array(N);
     for (i = 0; i < N; i++) {
-      if (cls[i] === K.WATER && osmM.water[i]) { cls[i] = K.OTHER; stats.osmCovered++; }
-      else if (cls[i] === K.FOREST && osmM.forest[i]) { cls[i] = K.OTHER; stats.osmCovered++; }
-      else if (cls[i] === K.ROAD && osmM.road[i]) { cls[i] = K.OTHER; stats.osmCovered++; }
+      zc[i] = zN[i] ? zS[i] / zN[i] : NaN;
+      var hasC = cN[i] > 0, chm = hasC ? cS[i] / cN[i] : null, chmSd = hasC ? Math.sqrt(Math.max(0, cS2[i] / cN[i] - chm * chm)) : 0;
+      var flat = gN[i] ? fN[i] / gN[i] : 0, nan = gN[i] ? nanN[i] / gN[i] : 0, f = null, lum = 0, green = false, kc = K.OTHER;
+      if (im && nn[i] >= 1) {
+        var m = sl[i] / nn[i];
+        f = { r: sr[i] / nn[i], g: sg[i] / nn[i], b: sb[i] / nn[i], tex: Math.sqrt(Math.max(0, sl2[i] / nn[i] - m * m)), chm: chm, nan: nan };
+        lum = m; green = 2 * f.g - f.r - f.b > 10 && f.g >= f.r && f.g >= f.b - 2; kc = B.classifyCell(f);
+      }
+      if (hasC) {
+        if (chm >= 3 && (!f || (green && lum < 150) || chmSd >= 1.2 || (lum < 100 && chmSd >= 0.6))) mF[i] = 1;
+      } else if (kc === K.FOREST) mF[i] = 1;
+      if (mF[i]) continue;
+      var low = !hasC || chm < 1;
+      if (low && kc === K.WATER) { mW[i] = 1; colW[i] = 1; }
+      else if (flat >= 0.75 && !(f && (lum > 170 || (green && lum > 95)))) mW[i] = 1;
+      else if (nan >= 0.6 && (!f || lum < 150)) { mW[i] = 1; colW[i] = 1; }
+      else if (f && green && lum >= 55 && (!hasC || chm < 0.8)) mG[i] = 1;
     }
-    var zones = [], toL = function(v){ return [xmin + v[0] * dc, ymax - v[1] * dc]; };
-    var polyOf = function(lb, c, minArea){
+    var zones = [], toL = function(q){ return [xmin + q[0] * dc, ymax - q[1] * dc]; };
+    var ringOf = function(lb, c, fine){
       var ring = B.traceOuter(lb.lab, c.id, cols, rows, c.first).map(toL);
       if (ring.length < 4) return null;
-      ring = B.simplifyRing(ring, dc * 0.9);
-      return ring.length >= 3 && B.polygonArea(ring) >= minArea ? ring : null;
+      ring = B.simplifyRing(ring, Math.max(dc * 1.2, Math.sqrt(c.n * dc * dc) / (fine || 45)));
+      return ring.length >= 3 ? ring : null;
     };
-    [[K.WATER, 'water', 300], [K.FOREST, 'forest', 1200]].forEach(function(t){
-      var mask = new Uint8Array(N); for (i = 0; i < N; i++) mask[i] = cls[i] === t[0] ? 1 : 0;
-      mask = erode(dilate(mask, cols, rows), cols, rows);          // fermeture : rochers, écume ou ombres ne découpent pas une rivière en morceaux
-      var lb = label(mask, cols, rows);
-      lb.comps.forEach(function(c){
-        if (c.n * dc * dc < t[2]) return;
-        var ring = polyOf(lb, c, t[2]);
-        if (!ring) return;
-        var type = t[1];
-        if (type === 'water') {                                // allongée et qui touche le bord du bloc : cours d'eau
-          var xs = ring.map(function(p){ return p[0]; }), ys = ring.map(function(p){ return p[1]; }), bw = Math.max.apply(null, xs) - Math.min.apply(null, xs), bh = Math.max.apply(null, ys) - Math.min.apply(null, ys);
-          var edge = Math.min.apply(null, xs) <= xmin + dc * 1.5 || Math.max.apply(null, xs) >= xmin + W - dc * 1.5 || Math.min.apply(null, ys) <= ymin + dc * 1.5 || Math.max.apply(null, ys) >= ymax - dc * 1.5;
-          if (edge && Math.max(bw, bh) >= 2.5 * Math.min(bw, bh)) type = 'river';
+    // --- eau : fermeture (rochers, écume, ombres), ouverture (taches isolées), puis contrôle physique de chaque composante
+    var wm = repeat(erode, repeat(dilate, mW, cols, rows, 2), cols, rows, 3);
+    wm = dilate(wm, cols, rows);
+    var wl = label(wm, cols, rows), members = {};
+    for (i = 0; i < N; i++) if (wl.lab[i]) (members[wl.lab[i]] || (members[wl.lab[i]] = [])).push(i);
+    var wOut = new Uint8Array(N), found = [];
+    wl.comps.forEach(function(c){
+      if (c.n * dc * dc < LIM.water) return;
+      var idx = members[c.id], zs = [], nCol = 0, q, t;
+      for (t = 0; t < idx.length; t++) { q = idx[t]; if (zc[q] === zc[q]) zs.push(zc[q]); if (colW[q]) nCol++; }
+      zs.sort(function(a, b){ return a - b; });
+      var level = zs.length ? zs[zs.length >> 1] : NaN, spread = zs.length ? zs[Math.floor(zs.length * 0.9)] - zs[Math.floor(zs.length * 0.1)] : 0, colour = nCol / idx.length;
+      // le plan d'eau s'étend aux cellules voisines à la même cote (sous un tablier, sous des branches, eau ridée) : 6 pas au plus
+      var own = new Uint8Array(N), front = idx.slice(), tol = Math.max(0.08, Math.min(0.4, spread));
+      for (t = 0; t < idx.length; t++) own[idx[t]] = 1;
+      for (var it = 0; it < 6 && front.length && level === level; it++) {
+        var next = [];
+        for (t = 0; t < front.length; t++) {
+          q = front[t]; var qx = q % cols, cand = [qx > 0 ? q - 1 : -1, qx < cols - 1 ? q + 1 : -1, q - cols, q + cols];
+          for (var e = 0; e < 4; e++) { var u = cand[e]; if (u >= 0 && u < N && !own[u] && Math.abs(zc[u] - level) < tol) { own[u] = 1; next.push(u); } }
         }
-        zones.push({ type: type, source: 'auto', polygon: ring });
-        stats[t[1]]++;
-      });
+        front = next;
+      }
+      // rives : cellules qui bordent le plan d'eau étendu (2 pas)
+      var bank = [], total = 0, x0 = cols, x1 = 0, y0 = rows, y1 = 0;
+      for (q = 0; q < N; q++) {
+        if (own[q]) { total++; var ox = q % cols, oy = (q - ox) / cols; if (ox < x0) x0 = ox; if (ox > x1) x1 = ox; if (oy < y0) y0 = oy; if (oy > y1) y1 = oy; continue; }
+        var bx = q % cols;
+        if (zc[q] === zc[q] && ((bx > 1 && own[q - 2]) || (bx < cols - 2 && own[q + 2]) || (q >= 2 * cols && own[q - 2 * cols]) || (q + 2 * cols < N && own[q + 2 * cols]))) bank.push(zc[q]);
+      }
+      bank.sort(function(a, b){ return a - b; });
+      var rise = bank.length ? bank[Math.floor(bank.length * 0.8)] - level : NaN;
+      // une eau est de niveau (étale : moins de 8 cm d'écart sur toute sa surface) ou plus basse que ses rives ;
+      // la couleur seule suffit si elle est franche (petit cours d'eau que le LiDAR n'a pas aplani)
+      var ok = (colour >= 0.6 && spread <= 1.5) || (spread <= 0.08 && total * dc * dc >= 2 * LIM.water && !(rise < -0.1)) || (spread <= 1.5 && rise >= 0.25 && spread <= rise);
+      // petit plan d'eau (moins de 3 000 m²) : il faut en plus la couleur de l'eau ou une rive franche (une pelouse bien plane n'en a pas)
+      if (ok && total * dc * dc < 3000 && colour < 0.3 && !(rise >= 0.4)) ok = false;
+      if (!ok) return;
+      for (q = 0; q < N; q++) if (own[q]) wOut[q] = 1;
+      found.push({ level: level });
     });
-    // routes : masque gris ouvert d'une cellule (retire les petites taches), puis lignes centrales des composantes allongées
-    var rm = new Uint8Array(N); for (i = 0; i < N; i++) rm[i] = cls[i] === K.ROAD ? 1 : 0;
-    rm = dilate(erode(rm, cols, rows), cols, rows);
-    // surfaces trop larges pour une route (stationnement, place, toit plat, rivière grise, plus de 28 m) : retirées, avec leur pourtour
-    var rr = Math.max(2, Math.round(14 / dc)), core = rm, fat, it;
-    for (it = 0; it < rr; it++) core = erode(core, cols, rows);
-    fat = core; for (it = 0; it < rr + 1; it++) fat = dilate(fat, cols, rows);
-    for (i = 0; i < N; i++) if (fat[i]) rm[i] = 0;
-    var rl = label(rm, cols, rows), box = {};
+    // plans d'eau retenus : contours refaits sur le masque étendu (deux morceaux séparés par un tablier n'en font plus qu'un)
+    wOut = erode(dilate(wOut, cols, rows), cols, rows);
+    var wf = label(wOut, cols, rows), wz = {}, wb = {};
     for (i = 0; i < N; i++) {
-      var id2 = rl.lab[i]; if (!id2) continue;
-      var bx = i % cols, by = (i - bx) / cols, bb = box[id2] || (box[id2] = { x0: bx, x1: bx, y0: by, y1: by, idx: [] });
-      if (bx < bb.x0) bb.x0 = bx; if (bx > bb.x1) bb.x1 = bx; if (by < bb.y0) bb.y0 = by; if (by > bb.y1) bb.y1 = by;
-      bb.idx.push(i);
+      var wid = wf.lab[i]; if (!wid) continue;
+      var bb = wb[wid] || (wb[wid] = { x0: cols, x1: 0, y0: rows, y1: 0 }), wx = i % cols, wy = (i - wx) / cols;
+      if (wx < bb.x0) bb.x0 = wx; if (wx > bb.x1) bb.x1 = wx; if (wy < bb.y0) bb.y0 = wy; if (wy > bb.y1) bb.y1 = wy;
+      if (zc[i] === zc[i]) (wz[wid] || (wz[wid] = [])).push(zc[i]);
     }
-    rl.comps.forEach(function(c){
-      if (c.n * dc * dc < 150) return;
-      var bb = box[c.id], bw = bb.x1 - bb.x0 + 3, bh = bb.y1 - bb.y0 + 3, sub2 = new Uint8Array(bw * bh);
-      bb.idx.forEach(function(q){ var qx = q % cols; sub2[(((q - qx) / cols) - bb.y0 + 1) * bw + (qx - bb.x0 + 1)] = 1; });
-      centerlines(sub2, bw, bh, dc, { minLen: 30 }).forEach(function(cl){
-        var wm = Math.max(cl.width, 1) * dc;
-        if (wm > 26 || cl.len * dc < 30 || cl.len * dc / wm < 4) return;          // trop large ou pas assez allongé : parking, toit, place
-        var line = cl.line.map(function(p){ return toL([p[0] + bb.x0 - 1, p[1] + bb.y0 - 1]); });
-        line = B.simplifyLine(line, dc * 1.2);
-        if (line.length >= 2) { zones.push({ type: 'road', source: 'auto', line: line, width: Math.max(3, Math.min(24, Math.round(wm * 2) / 2)) }); stats.road++; }
-      });
+    wf.comps.forEach(function(c){
+      if (c.n * dc * dc < LIM.water) return;
+      var poly = ringOf(wf, c), bb = wb[c.id];
+      if (!poly || B.polygonArea(poly) < LIM.water) return;
+      var sides = (bb.x0 <= 1 ? 1 : 0) + (bb.x1 >= cols - 2 ? 1 : 0) + (bb.y0 <= 1 ? 1 : 0) + (bb.y1 >= rows - 2 ? 1 : 0), bw = bb.x1 - bb.x0 + 1, bh = bb.y1 - bb.y0 + 1;
+      var type = sides >= 2 || (sides === 1 && Math.max(bw, bh) >= 2.5 * Math.min(bw, bh)) ? 'river' : 'water';
+      var zn = { type: type, source: 'auto', polygon: poly }, level = median(wz[c.id] || []);
+      if (level === level) zn.level = Math.round(level * 100) / 100;
+      zones.push(zn); stats[type]++;
     });
-    return { zones: zones, dc: dc, stats: stats, cls: cls, G: G };
+    // --- forêt et herbe : les plus grandes surfaces seulement
+    var areaZones = function(mask, type, minArea, maxN, close, open){
+      var mm = repeat(erode, repeat(dilate, mask, cols, rows, close), cols, rows, close + open);
+      mm = repeat(dilate, mm, cols, rows, open);
+      var lb = label(mm, cols, rows);
+      lb.comps.filter(function(c){ return c.n * dc * dc >= minArea; }).sort(function(a, b){ return b.n - a.n; }).slice(0, maxN).forEach(function(c){
+        var poly = ringOf(lb, c, type === 'grass' ? 22 : 45);
+        if (poly && B.polygonArea(poly) >= minArea) { zones.push({ type: type, source: 'auto', polygon: poly }); stats[type]++; }
+      });
+    };
+    areaZones(mF, 'forest', LIM.forest, LIM.maxForest, 2, 1);
+    for (i = 0; i < N; i++) if (wOut[i]) { mF[i] = 0; mG[i] = 0; }
+    areaZones(mG, 'grass', LIM.grass, LIM.maxGrass, 1, 3);
+    // --- routes
+    if (o.roads) B.roadsFromMask(o.roads, { x0: xmin, y0: ymin, x1: xmin + W, y1: ymax }).forEach(function(r){ zones.push(r); stats.road++; });
+    return { zones: zones, dc: dc, stats: stats, G: G };
   };
 
-  // ---------- OpenStreetMap (Overpass `out geom`) -> zones et ponts en mètres locaux ----------
-  var HW_WIDTH = { motorway: 12, trunk: 10, primary: 9, secondary: 8, tertiary: 7, unclassified: 6, residential: 6, service: 4, motorway_link: 7, trunk_link: 7, primary_link: 6, secondary_link: 6, tertiary_link: 6, track: 3.5, living_street: 5 };
-  B.OSM_HIGHWAYS = 'motorway|trunk|primary|secondary|tertiary|unclassified|residential|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link|track|living_street';
-  // Requête Overpass pour le rectangle (s, w, n, e)
-  B.overpassQuery = function(s, w, n, e){
-    var bb = [s, w, n, e].map(function(v){ return v.toFixed(6); }).join(',');
-    return '[out:json][timeout:25];(' +
-      'way[natural=water](' + bb + ');way[waterway~"^(riverbank|river|stream|canal|drain|ditch)$"](' + bb + ');' +
-      'rel[natural=water](' + bb + ');rel[waterway=riverbank](' + bb + ');' +
-      'way[natural=wood](' + bb + ');way[landuse=forest](' + bb + ');rel[natural=wood](' + bb + ');rel[landuse=forest](' + bb + ');' +
-      'way[landuse~"^(grass|meadow|recreation_ground)$"](' + bb + ');way[natural=grassland](' + bb + ');way[leisure=park](' + bb + ');' +
-      'way[highway~"^(' + B.OSM_HIGHWAYS + ')$"](' + bb + ');way[man_made=bridge](' + bb + ');' +
-      ');out geom;';
-  };
-  function tagNum(v){ var n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) ? n : null; }
-  // Renvoie { zones: [...], bridges: [{ line, name, ref }] } ; tout est découpé au rectangle du bloc (x0, y0, x1, y1 en m locaux)
-  B.osmToZones = function(json, F, rc){
-    var zones = [], bridges = [], els = (json && json.elements) || [];
-    var loc = function(geom){ return (geom || []).map(function(p){ return B.toLocal(F, p.lat, p.lon); }); };
-    var addPoly = function(ring, type){
-      if (ring.length < 3) return;
-      var c = B.clipPolygon(ring, rc);
-      if (c.length >= 3 && B.polygonArea(c) >= 20) zones.push({ type: type, source: 'osm', polygon: c });
+  // ---------- Routes : masque d'image (WMS CanVec) -> lignes centrales ----------
+  // mask = { px (RGBA, opaque = route), w, h } couvrant le rectangle rc = { x0, y0, x1, y1 } (m locaux, y vers le nord).
+  // Squelette, découpe aux carrefours, raccord des tronçons qui se prolongent (moins de 35° d'écart) : peu de routes, longues.
+  // Renvoie des zones { type: 'road', source: 'auto', line, width }.
+  B.roadsFromMask = function(mask, rc, opt){
+    opt = opt || {};
+    var w = mask.w, h = mask.h, n = w * h, m = new Uint8Array(n), i, k, px = mask.px, sx = (rc.x1 - rc.x0) / w, sy = (rc.y1 - rc.y0) / h, mpp = (sx + sy) / 2;
+    for (i = 0; i < n; i++) m[i] = px[i * 4 + 3] > 96 ? 1 : 0;
+    for (i = 0; i < w; i++) { m[i] = 0; m[n - w + i] = 0; }
+    for (i = 0; i < h; i++) { m[i * w] = 0; m[i * w + w - 1] = 0; }
+    var sk = thin(m, w, h);
+    // nombre de branches autour d'un pixel = passages 0 -> 1 en tournant autour de lui (un coin d'escalier du squelette n'est pas un carrefour)
+    var RING = [-w, -w + 1, 1, w + 1, w, w - 1, -1, -w - 1];
+    var deg = function(p, src){ var c = 0; for (var q = 0; q < 8; q++) if (!(src || sk)[p + RING[q]] && (src || sk)[p + RING[(q + 1) % 8]]) c++; return c; };
+    // carrefours : pixels du squelette à 3 voisins ou plus ; retirés, il reste des tronçons simples
+    var junc = new Uint8Array(n), seg = new Uint8Array(n);
+    for (i = w + 1; i < n - w - 1; i++) if (sk[i]) { if (deg(i) >= 3) junc[i] = 1; else seg[i] = 1; }
+    // le voisinage immédiat d'un carrefour est retiré aussi : sinon deux branches restent liées en diagonale
+    for (i = w + 1; i < n - w - 1; i++) if (junc[i]) for (k = 0; k < 8; k++) seg[i + RING[k]] = 0;
+    var seen = new Uint8Array(n), raw = [];
+    var ORD = [-w, -1, 1, w, -w - 1, -w + 1, w - 1, w + 1];           // voisins directs d'abord
+    var nb = function(p){ var out = []; for (var q = 0; q < 8; q++) { var t = p + ORD[q]; if (seg[t] && !seen[t]) out.push(t); } return out; };
+    var walk = function(start){
+      var path = [start], p = start, nx;
+      seen[start] = 1;
+      while ((nx = nb(p)).length) { p = nx[0]; seen[p] = 1; path.push(p); }
+      return path;
     };
-    var waterPolys = [];
-    els.forEach(function(el){
-      var t = el.tags || {};
-      var isWater = t.natural === 'water' || t.waterway === 'riverbank', isForest = t.natural === 'wood' || t.landuse === 'forest';
-      // v0.7.3 : herbe / sol ouvert (pelouse, pré, parc) : zone « grass », aussi modifiable dans BS3D
-      var isGrass = !isWater && !isForest && (/^(grass|meadow|recreation_ground)$/.test(t.landuse || '') || t.natural === 'grassland' || t.leisure === 'park');
-      if (isGrass && el.type === 'way') {
-        var gring = loc(el.geometry);
-        if (gring.length > 3 && gring[0][0] === gring[gring.length - 1][0] && gring[0][1] === gring[gring.length - 1][1]) gring.pop();
-        addPoly(gring, 'grass');
-      } else if ((isWater || isForest) && el.type === 'way') {
-        var ring = loc(el.geometry);
-        if (ring.length > 3 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]) ring.pop();
-        if (isForest) addPoly(ring, 'forest');
-        else { addPoly(ring, (t.water === 'river' || t.waterway === 'riverbank' || t.water === 'canal') ? 'river' : 'water'); waterPolys.push(ring); }
-      } else if ((isWater || isForest) && el.type === 'relation') {
-        var outers = (el.members || []).filter(function(m){ return m.role === 'outer' && m.geometry; }).map(function(m){ return loc(m.geometry); });
-        B.stitchRings(outers).forEach(function(ring){
-          if (isForest) addPoly(ring, 'forest');
-          else { addPoly(ring, (t.water === 'river' || t.waterway === 'riverbank' || t.water === 'canal') ? 'river' : 'water'); waterPolys.push(ring); }
-        });
+    for (i = w + 1; i < n - w - 1; i++) {
+      if (!seg[i] || seen[i]) continue;
+      if (deg(i, seg) > 1) continue;                                   // on part d'une extrémité
+      raw.push(walk(i));
+    }
+    for (i = w + 1; i < n - w - 1; i++) if (seg[i] && !seen[i]) raw.push(walk(i));           // boucles fermées
+    var XY = function(p){ var x = p % w; return [rc.x0 + (x + 0.5) * sx, rc.y1 - ((p - x) / w + 0.5) * sy]; };
+    var segs = raw.filter(function(path){ return path.length >= 3; }).map(function(path){
+      // épaisseur du trait (px) : pixels du masque dans une fenêtre 7 × 7 autour de chaque pixel du tronçon, divisés par 7
+      var ws = path.map(function(p){ var c = 0; for (var j = -3; j <= 3; j++) for (var q = -3; q <= 3; q++) { var t = p + j * w + q; if (t >= 0 && t < n && m[t]) c++; } return c / 7; }).sort(function(a, b){ return a - b; });
+      return { line: path.map(XY), thick: ws[ws.length >> 1] };
+    });
+    // raccord : à chaque extrémité, le tronçon voisin (à moins de 4 px) le mieux aligné
+    var reach = 6.5 * mpp, dirAt = function(line, end){
+      var a = end ? line[line.length - 1] : line[0], b = end ? line[Math.max(0, line.length - 6)] : line[Math.min(line.length - 1, 5)], L = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1;
+      return [(a[0] - b[0]) / L, (a[1] - b[1]) / L];          // vers l'extérieur du tronçon
+    };
+    var merged = true, guard = 0;
+    while (merged && guard++ < 500) {
+      merged = false;
+      var best = null;
+      for (var a = 0; a < segs.length; a++) for (var ea = 0; ea < 2; ea++) {
+        var A = segs[a].line, pa = ea ? A[A.length - 1] : A[0], da = dirAt(A, ea);
+        for (var b = a + 1; b < segs.length; b++) for (var eb = 0; eb < 2; eb++) {
+          var Bl = segs[b].line, pb = eb ? Bl[Bl.length - 1] : Bl[0];
+          if (Math.abs(pa[0] - pb[0]) > reach || Math.abs(pa[1] - pb[1]) > reach) continue;
+          var db = dirAt(Bl, eb), dot = -(da[0] * db[0] + da[1] * db[1]);        // 1 = prolongement parfait
+          if (dot > 0.82 && Math.abs(segs[a].thick - segs[b].thick) < 1.6 && (!best || dot > best.dot)) best = { a: a, ea: ea, b: b, eb: eb, dot: dot };
+        }
       }
+      if (best) {
+        var la = segs[best.a].line, lb2 = segs[best.b].line;
+        if (!best.ea) la = la.slice().reverse();
+        if (best.eb) lb2 = lb2.slice().reverse();
+        var na = la.length, nb2 = lb2.length;
+        segs[best.a] = { line: la.concat(lb2), thick: (segs[best.a].thick * na + segs[best.b].thick * nb2) / (na + nb2) };
+        segs.splice(best.b, 1); merged = true;
+      }
+    }
+    var minLen = opt.minLen || B.LIMITS.roadMin, out = [];
+    segs.forEach(function(s){
+      var line = B.simplifyLine(s.line, Math.max(1.2, mpp * 1.3)), len = 0;
+      for (var t = 0; t + 1 < line.length; t++) len += Math.hypot(line[t + 1][0] - line[t][0], line[t + 1][1] - line[t][1]);
+      if (line.length < 2 || len < minLen) return;
+      // épaisseur du trait CanVec (px, indépendante de l'échelle) : autoroute, route principale, rue ou chemin
+      out.push({ type: 'road', source: 'auto', line: line, width: s.thick >= 2.1 ? 11 : s.thick >= 1.3 ? 8 : 6.5, len: len });
     });
-    // cours d'eau tracés en ligne seulement (sans surface cartographiée autour) : élargis à une largeur type
-    els.forEach(function(el){
-      var t = el.tags || {};
-      if (el.type !== 'way' || !t.waterway || t.waterway === 'riverbank') return;
-      var line = loc(el.geometry), width = tagNum(t.width) || ({ river: 25, canal: 14, stream: 4, drain: 3, ditch: 2 }[t.waterway] || 4);
-      if (line.length < 2) return;
-      // déjà dans une surface d'eau cartographiée (plus de la moitié de la ligne, échantillonnée tous les 10 m) : pas d'élargissement
-      var smp = [], covered = false;
-      for (var si = 0; si + 1 < line.length; si++) { var sl = Math.hypot(line[si + 1][0] - line[si][0], line[si + 1][1] - line[si][1]), sn = Math.max(1, Math.ceil(sl / 10)); for (var sk = 0; sk < sn; sk++) smp.push([line[si][0] + (line[si + 1][0] - line[si][0]) * sk / sn, line[si][1] + (line[si + 1][1] - line[si][1]) * sk / sn]); }
-      waterPolys.forEach(function(r){ var c = 0; smp.forEach(function(q){ if (B.pointInPolygon(q, r)) c++; }); if (c * 2 > smp.length) covered = true; });
-      if (covered) return;
-      B.clipLine(line, rc).forEach(function(part){
-        var poly = B.bufferLine(part, width / 2);
-        if (poly.length >= 4) { var c = B.clipPolygon(poly, rc); if (c.length >= 3) zones.push({ type: 'river', source: 'osm', polygon: c, line: true }); }
-      });
-    });
-    els.forEach(function(el){
-      var t = el.tags || {};
-      if (el.type !== 'way' || !((t.highway && HW_WIDTH[t.highway]) || t.man_made === 'bridge')) return;       // sentiers et pistes cyclables : ignorés
-      var line = loc(el.geometry);
-      if (line.length < 2) return;
-      if (t.bridge && t.bridge !== 'no' || t.man_made === 'bridge') bridges.push({ line: line, name: t.name || t.ref || null, highway: t.highway || null });
-      if (!t.highway || !HW_WIDTH[t.highway]) return;
-      var width = tagNum(t.width) || (tagNum(t.lanes) ? tagNum(t.lanes) * 3.5 : null) || HW_WIDTH[t.highway] || 6;
-      var lanes = tagNum(t.lanes), oneway = t.oneway === 'yes' || t.oneway === '1' || t.junction === 'roundabout' ? 1 : t.oneway === '-1' ? -1 : 0;
-      B.clipLine(line, rc).forEach(function(part){
-        var z = { type: 'road', source: 'osm', line: part, width: Math.max(3, Math.min(25, width)), bridge: !!(t.bridge && t.bridge !== 'no') };
-        if (lanes > 0) z.lanes = lanes; if (oneway) z.oneway = oneway;
-        zones.push(z);
-      });
-    });
-    return { zones: zones, bridges: bridges };
+    out.sort(function(p, q){ return q.len - p.len; });
+    return out.map(function(r){ return { type: r.type, source: r.source, line: r.line, width: r.width }; });
   };
-  // Axe de pont proposé autour d'un point local `p` (position de la structure) : tronçon OSM « bridge » le plus proche
-  // (à moins de `maxD` m), sinon route la plus proche, sinon axe est-ouest de `len` m. Orienté de l'ouest vers l'est
-  // (ou du sud vers le nord si l'axe est presque vertical). Renvoie { axis, from: 'osm-pont' | 'osm-route' | 'defaut' }.
-  B.suggestAxis = function(p, bridges, roads, len, maxD){
-    maxD = maxD || 80;
-    var best = null;
-    var consider = function(line, from){
-      var d = B.distToLine(p, line);
-      if (d <= maxD && (!best || d < best.d - (from === 'osm-pont' && best.from !== 'osm-pont' ? 30 : 0))) best = { d: d, line: line, from: from };
+  // Étendue du tablier le long d'un axe proposé : là où la surface (MNS) dépasse le sol (MNT) d'au moins 1,5 m, autour du point p.
+  // Renvoie [a, b] (m locaux) ou null si aucun tablier n'est visible (pont bas, MNS absent).
+  B.deckExtent = function(p, dir, grid, mnt, mns, maxHalf){
+    if (!mns) return null;
+    var at = function(t){
+      var x = p[0] + dir[0] * t, y = p[1] + dir[1] * t, c = Math.round((x - grid.x0) / grid.cell), r = Math.round((grid.y0 - y) / grid.cell);
+      if (c < 0 || r < 0 || c >= grid.cols || r >= grid.rows) return null;
+      var d = mns[r * grid.cols + c] - mnt[r * grid.cols + c];
+      return d === d ? d : 0;
     };
-    bridges.forEach(function(b){ consider(b.line, 'osm-pont'); });
-    if (!best) roads.forEach(function(r){ consider(r, 'osm-route'); });
-    var a, b;
+    var up = function(t){ var d = at(t); return d != null && d >= 1.5; }, t0 = null, t;
+    for (t = 0; t <= 25 && t0 == null; t++) { if (up(t)) t0 = t; else if (up(-t)) t0 = -t; }       // le point du MTMD est parfois à côté du tablier
+    if (t0 == null) return null;
+    var run = function(sgn){ var e = t0, gap = 0; for (var s = t0; Math.abs(s) <= maxHalf && gap <= 3; s += sgn) { if (up(s)) { e = s; gap = 0; } else gap++; } return e; };
+    var a = run(-1), b = run(1);
+    if (b - a < 6) return null;
+    return [[p[0] + dir[0] * a, p[1] + dir[1] * a], [p[0] + dir[0] * b, p[1] + dir[1] * b]];
+  };
+
+  // v0.7.4 : pont existant retiré du relief. Dans le couloir du tablier (axe, largeur + 2 m de chaque côté), le sol est
+  // interpolé d'une rive du couloir à l'autre, perpendiculairement à l'axe : la rivière ou la route franchie continue sous
+  // l'ouvrage. Le MNT n'est corrigé que là où il dépasse ce sol de plus de 30 cm (tablier ou culée restés dans le MNT) ; le MNS
+  // du couloir prend la valeur du sol (plus de tablier). Renvoie { mnt, mns, cells } (copies ; cells = cellules du MNT corrigées).
+  B.removeBridge = function(grid, mnt, mns, axis, width){
+    var a = axis[0], b = axis[1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), out = { mnt: new Float32Array(mnt), mns: mns ? new Float32Array(mns) : null, cells: 0 };
+    if (!(L > 1)) return out;
+    var ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, nx = -uy, ny = ux, hw = Math.max(2, (width || 12) / 2) + 2, cell = grid.cell, cols = grid.cols, rows = grid.rows;
+    var at = function(x, y){
+      var c = Math.round((x - grid.x0) / cell), r = Math.round((grid.y0 - y) / cell);
+      return c < 0 || r < 0 || c >= cols || r >= rows ? NaN : mnt[r * cols + c];
+    };
+    // sol de chaque côté du couloir, à l'abscisse t : moyenne de 4 points entre 1 et 4 m au-delà du bord
+    var side = function(t, sgn){
+      var s = 0, n = 0;
+      for (var k = 1; k <= 4; k++) { var u = sgn * (hw + k), v = at(a[0] + ux * t + nx * u, a[1] + uy * t + ny * u); if (v === v) { s += v; n++; } }
+      return n ? s / n : NaN;
+    };
+    var xs = [a[0] + nx * hw, a[0] - nx * hw, b[0] + nx * hw, b[0] - nx * hw], ys = [a[1] + ny * hw, a[1] - ny * hw, b[1] + ny * hw, b[1] - ny * hw];
+    var c0 = Math.max(0, Math.floor((Math.min.apply(null, xs) - grid.x0) / cell) - 1), c1 = Math.min(cols - 1, Math.ceil((Math.max.apply(null, xs) - grid.x0) / cell) + 1);
+    var r0 = Math.max(0, Math.floor((grid.y0 - Math.max.apply(null, ys)) / cell) - 1), r1 = Math.min(rows - 1, Math.ceil((grid.y0 - Math.min.apply(null, ys)) / cell) + 1), memo = {};
+    for (var r = r0; r <= r1; r++) for (var c = c0; c <= c1; c++) {
+      var x = grid.x0 + c * cell - a[0], y = grid.y0 - r * cell - a[1], t = x * ux + y * uy, u = x * nx + y * ny;
+      if (t < 0 || t > L || Math.abs(u) > hw) continue;
+      var key = Math.floor(t / cell), sd = memo[key] || (memo[key] = [side((key + 0.5) * cell, -1), side((key + 0.5) * cell, 1)]), zl = sd[0], zr = sd[1];
+      var z = zl === zl && zr === zr ? zl + (zr - zl) * (u + hw) / (2 * hw) : zl === zl ? zl : zr, i = r * cols + c;
+      if (!(z === z)) continue;
+      if (!(mnt[i] === mnt[i]) || mnt[i] - z > 0.3) { out.mnt[i] = z; out.cells++; }
+      if (out.mns) out.mns[i] = out.mnt[i];
+    }
+    return out;
+  };
+  // Axe de pont proposé autour d'un point local `p` (position de la structure) : la route la plus proche (à moins de `maxD` m)
+  // donne la direction, sinon axe est-ouest de `len` m. Orienté de l'ouest vers l'est (ou du sud vers le nord si l'axe est
+  // presque vertical). Renvoie { axis, from: 'route' | 'defaut', dir, at } ; `at` = point de la route le plus proche de p.
+  B.suggestAxis = function(p, roads, len, maxD){
+    maxD = maxD || 80;
+    var best = null, ux = 1, uy = 0;
+    (roads || []).forEach(function(line){ var d = B.distToLine(p, line); if (d <= maxD && (!best || d < best.d)) best = { d: d, line: line }; });
     if (best) {
-      // segment le plus proche
       var line = best.line, bi = 0, bd = Infinity;
       for (var i = 0; i + 1 < line.length; i++) { var d = segD2(p, line[i], line[i + 1]); if (d < bd) { bd = d; bi = i; } }
-      var s0 = line[bi], s1 = line[bi + 1], ux = s1[0] - s0[0], uy = s1[1] - s0[1], L = Math.hypot(ux, uy) || 1;
-      ux /= L; uy /= L;
+      var s0 = line[bi], s1 = line[bi + 1], L = Math.hypot(s1[0] - s0[0], s1[1] - s0[1]) || 1;
+      ux = (s1[0] - s0[0]) / L; uy = (s1[1] - s0[1]) / L;
       var tp = Math.max(0, Math.min(L, (p[0] - s0[0]) * ux + (p[1] - s0[1]) * uy));
       p = [s0[0] + ux * tp, s0[1] + uy * tp];               // l'axe passe par le point de la route le plus proche de la structure
-      if (best.from === 'osm-pont' && line.length >= 2) {
-        // toute la longueur du tronçon « pont », projetée sur la direction du segment le plus proche
-        var tmin = Infinity, tmax = -Infinity;
-        line.forEach(function(q){ var t = (q[0] - p[0]) * ux + (q[1] - p[1]) * uy; if (t < tmin) tmin = t; if (t > tmax) tmax = t; });
-        a = [p[0] + ux * tmin, p[1] + uy * tmin]; b = [p[0] + ux * tmax, p[1] + uy * tmax];
-        if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 8) { a = [p[0] - ux * len / 2, p[1] - uy * len / 2]; b = [p[0] + ux * len / 2, p[1] + uy * len / 2]; }
-      } else { a = [p[0] - ux * len / 2, p[1] - uy * len / 2]; b = [p[0] + ux * len / 2, p[1] + uy * len / 2]; }
-    } else { a = [p[0] - len / 2, p[1]]; b = [p[0] + len / 2, p[1]]; }
-    var dx = b[0] - a[0], dy = b[1] - a[1];
-    if (Math.abs(dx) >= Math.abs(dy) ? dx < 0 : dy < 0) { var t2 = a; a = b; b = t2; }
-    return { axis: [a, b], from: best ? best.from : 'defaut' };
+    }
+    if (Math.abs(ux) >= Math.abs(uy) ? ux < 0 : uy < 0) { ux = -ux; uy = -uy; }
+    return { axis: [[p[0] - ux * len / 2, p[1] - uy * len / 2], [p[0] + ux * len / 2, p[1] + uy * len / 2]], from: best ? 'route' : 'defaut', dir: [ux, uy], at: p };
   };
 
   root.QA_MOD = root.QA_MOD || {};
