@@ -135,42 +135,76 @@ function synth(){
   }
   return { px: px, w: W, h: H };
 }
-ok('detect : eau, forêt et route reconnues sur une image synthétique', function(){
-  var im = synth(), g = { cols: 100, rows: 80, cell: 2, x0: -99, y0: 79 }, N = g.cols * g.rows;
-  var mnt = new Float32Array(N).fill(5), mns = new Float32Array(N).fill(5);
-  // le MNS montre la canopée (12 m) sur la forêt
-  for (var r = 0; r < g.rows; r++) for (var c = 0; c < g.cols; c++) if (c >= 60 && r >= 45) mns[r * g.cols + c] = 17;
-  var R = B.detect({ grid: g, img: im, mnt: mnt, mns: mns, osm: null });
-  var byType = {}; R.zones.forEach(function(z){ (byType[z.type] = byType[z.type] || []).push(z); });
-  assert.ok(byType.river || byType.water, 'eau détectée'); assert.ok(byType.forest, 'forêt détectée'); assert.ok(byType.road, 'route détectée');
-  var water = (byType.river || byType.water)[0], forest = byType.forest[0], road = byType.road[0];
-  // eau : 70 × 70 m, coin nord-ouest (x ∈ [-100, -30], y ∈ [10, 80])
-  near(B.polygonArea(water.polygon), 70 * 70, 600, 'aire de l\'eau');
-  assert.ok(B.pointInPolygon([-65, 45], water.polygon)); assert.ok(!B.pointInPolygon([0, -30], water.polygon));
-  // forêt : 80 × 70 m, coin sud-est (x ∈ [20, 100], y ∈ [-80, -10])
-  near(B.polygonArea(forest.polygon), 80 * 70, 700, 'aire de la forêt');
-  assert.ok(B.pointInPolygon([60, -45], forest.polygon));
-  // route : bande de 8 m de large vers y = 80 − 82 = -2 (image à 1 m/px ; bord nord à y = 80)
-  var xs = road.line.map(function(p){ return p[0]; }), ys = road.line.map(function(p){ return p[1]; });
-  assert.ok(Math.max.apply(null, xs) - Math.min.apply(null, xs) > 150, 'longueur de la route');
-  ys.forEach(function(y){ near(y, -2, 4, 'ordonnée de l\'axe'); });
-  near(road.width, 8, 3, 'largeur');
-  assert.ok(R.zones.every(function(z){ return z.source === 'auto'; }));
-  assert.equal(R.dc, 2);
+// v0.7.4 : détection par le LiDAR. Terrain en pente douce (2 %), un lac plan à la cote 3 (60 × 60 m, rives 1 m plus haut),
+// une forêt (canopée de 12 m, rugueuse) et une pelouse verte ; l'image n'est utile qu'à l'herbe.
+function site(){
+  var g = { cols: 200, rows: 160, cell: 1, x0: -99.5, y0: 79.5 }, N = g.cols * g.rows, mnt = new Float32Array(N), mns = new Float32Array(N);
+  var W = 200, H = 160, px = new Uint8ClampedArray(W * H * 4);
+  for (var r = 0; r < g.rows; r++) for (var c = 0; c < g.cols; c++) {
+    var x = g.x0 + c, y = g.y0 - r, i = r * g.cols + c, lake = x > -80 && x < -20 && y > 10 && y < 70, forest = x > 20 && y < -10, lawn = x < -10 && y < -20;
+    mnt[i] = lake ? 3 : 4.2 + 0.02 * (x + 100) + 0.03 * Math.sin(x * 0.9) * Math.cos(y * 1.1);
+    mns[i] = mnt[i] + (forest ? 9 + 4 * Math.abs(Math.sin(c * 1.7) * Math.cos(r * 2.3)) : 0);
+    var col = lake ? [40, 60, 70] : forest ? [40, 80, 40] : lawn ? [90, 150, 70] : [150, 135, 110];
+    px[i * 4] = col[0]; px[i * 4 + 1] = col[1]; px[i * 4 + 2] = col[2]; px[i * 4 + 3] = 255;
+  }
+  return { grid: g, mnt: mnt, mns: mns, img: { px: px, w: W, h: H } };
+}
+ok('detect : lac plan (avec sa cote), forêt par la canopée, herbe ; peu de zones, toutes « auto »', function(){
+  var s = site(), R = B.detect({ grid: s.grid, img: s.img, mnt: s.mnt, mns: s.mns, roads: null });
+  var t = function(k){ return R.zones.filter(function(z){ return z.type === k; }); };
+  assert.equal(t('water').length + t('river').length, 1, 'un seul plan d\'eau');
+  var lake = t('water')[0];
+  assert.ok(lake, 'lac fermé : « water », pas « river »');
+  near(B.polygonArea(lake.polygon), 3600, 500, 'aire du lac'); near(lake.level, 3, 0.05, 'cote du lac lue dans le MNT');
+  assert.ok(B.pointInPolygon([-50, 40], lake.polygon)); assert.ok(!B.pointInPolygon([50, 40], lake.polygon));
+  assert.equal(t('forest').length, 1); near(B.polygonArea(t('forest')[0].polygon), 80 * 70, 800, 'aire de la forêt');
+  assert.equal(t('grass').length, 1); assert.ok(B.pointInPolygon([-60, -50], t('grass')[0].polygon));
+  assert.equal(t('road').length, 0);
+  assert.ok(R.zones.length <= 4 && R.zones.every(function(z){ return z.source === 'auto'; }));
 });
-ok('detect : les zones OSM l\'emportent (cellules couvertes retirées de la détection)', function(){
-  var im = synth(), g = { cols: 100, rows: 80, cell: 2, x0: -99, y0: 79 }, N = g.cols * g.rows;
-  var mnt = new Float32Array(N).fill(5);
-  var osm = { zones: [{ type: 'water', source: 'osm', polygon: [[-101, 81], [-28, 81], [-28, 8], [-101, 8]] }, { type: 'road', source: 'osm', line: [[-100, -2], [100, -2]], width: 8 }] };
-  var R = B.detect({ grid: g, img: im, mnt: mnt, mns: null, osm: osm });
-  assert.ok(!R.zones.some(function(z){ return z.type === 'water' || z.type === 'river'; }), 'eau déjà couverte par OSM');
-  assert.ok(!R.zones.some(function(z){ return z.type === 'road'; }), 'route déjà couverte par OSM');
-  assert.ok(R.zones.some(function(z){ return z.type === 'forest'; }), 'la forêt, absente d\'OSM, reste détectée');
-  assert.ok(R.stats.osmCovered > 500);
+ok('detect : un sol plan sans rive plus haute ni couleur d\'eau n\'est pas de l\'eau ; sans MNS ni image, rien n\'est inventé', function(){
+  var g = { cols: 120, rows: 120, cell: 1, x0: -59.5, y0: 59.5 }, N = g.cols * g.rows, mnt = new Float32Array(N), px = new Uint8ClampedArray(N * 4);
+  // dalle parfaitement plane de 30 × 30 m, 20 cm plus haute que le terrain autour (stationnement, toit bas), sol brun partout
+  for (var r = 0; r < g.rows; r++) for (var c = 0; c < g.cols; c++) { var i = r * g.cols + c, slab = Math.abs(g.x0 + c) < 15 && Math.abs(g.y0 - r) < 15; mnt[i] = slab ? 10.2 : 10 + 0.04 * Math.sin(c * 0.8 + r); px[i * 4] = 150; px[i * 4 + 1] = 135; px[i * 4 + 2] = 110; px[i * 4 + 3] = 255; }
+  var R = B.detect({ grid: g, img: { px: px, w: 120, h: 120 }, mnt: mnt, mns: new Float32Array(mnt), roads: null });
+  assert.equal(R.zones.filter(function(z){ return z.type === 'water' || z.type === 'river'; }).length, 0);
+  var R2 = B.detect({ grid: g, img: null, mnt: mnt, mns: null, roads: null });
+  assert.equal(R2.zones.length, 0);
 });
-ok('detect : sans image, aucune zone auto', function(){
-  var g = { cols: 20, rows: 20, cell: 2, x0: -19, y0: 19 }, R = B.detect({ grid: g, img: null, mnt: new Float32Array(400), mns: null, osm: null });
-  assert.equal(R.zones.length, 0);
+ok('routes : masque d\'image -> lignes centrales longues, carrefour en T, largeur selon l\'épaisseur du trait', function(){
+  var W = 200, H = 200, px = new Uint8ClampedArray(W * H * 4), set = function(x, y){ if (x >= 0 && y >= 0 && x < W && y < H) px[(y * W + x) * 4 + 3] = 255; };
+  for (var x = 0; x < W; x++) for (var k = -1; k <= 1; k++) set(x, 100 + k);            // route est-ouest, trait de 3 px
+  for (var y = 100; y < H; y++) set(60, y);                                             // rue vers le sud, trait de 1 px
+  for (var q = 0; q < 6; q++) set(150 + q, 30);                                         // tache : trop courte
+  var roads = B.roadsFromMask({ px: px, w: W, h: H }, { x0: -100, y0: -100, x1: 100, y1: 100 });
+  assert.equal(roads.length, 2, 'la route principale n\'est pas coupée au carrefour');
+  var main = roads[0], side = roads[1];
+  assert.ok(Math.abs(main.line[0][0] - main.line[main.line.length - 1][0]) > 180, 'route principale d\'un bord à l\'autre');
+  main.line.forEach(function(p){ near(p[1], -0.5, 2, 'ordonnée de la route principale'); });
+  assert.equal(main.width, 11); assert.equal(side.width, 6.5);
+  side.line.forEach(function(p){ near(p[0], -39.5, 2, 'abscisse de la rue'); });
+  assert.ok(roads.every(function(z){ return z.type === 'road' && z.source === 'auto'; }));
+});
+ok('pont existant retiré du relief : sol interpolé sous le tablier, MNS ramené au sol, reste intact', function(){
+  // vallée en V (rivière nord-sud en x = 0), tablier à la cote 10 de x = -20 à 20, 10 m de large, resté dans le MNT
+  var g = B.gridFor(100, 60), N = g.cols * g.rows, mnt = new Float32Array(N), mns = new Float32Array(N);
+  for (var r = 0; r < g.rows; r++) for (var c = 0; c < g.cols; c++) { var x = g.x0 + c, y = g.y0 - r, gr = Math.min(10, Math.abs(x) * 0.5), deck = Math.abs(y) <= 5 && Math.abs(x) <= 20; mnt[r * g.cols + c] = deck ? 10 : gr; mns[r * g.cols + c] = deck ? 11 : gr + (y > 20 ? 8 : 0); }
+  var o = B.removeBridge(g, mnt, mns, [[-20, 0], [20, 0]], 10), at = function(a, x, y){ return a[Math.round(g.y0 - y) * g.cols + Math.round(x - g.x0)]; };
+  near(at(o.mnt, 0.5, 0.5), 0.25, 0.01, 'fond de vallée sous le tablier'); near(at(o.mnt, 10.5, 0.5), 5.25, 0.01, 'versant sous le tablier');
+  near(at(o.mns, 0.5, 0.5), 0.25, 0.01, 'MNS sans tablier');
+  assert.equal(at(o.mnt, 0.5, 20.5), 0.25); assert.equal(at(o.mns, 0.5, 25.5), 8.25);      // hors du couloir : inchangé
+  assert.equal(at(mnt, 0.5, 0.5), 10, 'grilles d\'origine intactes'); assert.ok(o.cells > 300);
+  // MNT déjà sans pont : rien à corriger (le sol mesuré est gardé)
+  var bare = new Float32Array(N); for (var i = 0; i < N; i++) bare[i] = Math.min(10, Math.abs(g.x0 + i % g.cols) * 0.5);
+  assert.equal(B.removeBridge(g, bare, null, [[-20, 0], [20, 0]], 10).cells, 0);
+});
+ok('tablier lu dans le MNS : les deux bouts de l\'axe', function(){
+  var g = B.gridFor(100, 40), N = g.cols * g.rows, mnt = new Float32Array(N).fill(5), mns = new Float32Array(N).fill(5);
+  for (var r = 0; r < g.rows; r++) for (var c = 0; c < g.cols; c++) { var x = g.x0 + c, y = g.y0 - r; if (x >= -18 && x <= 22 && Math.abs(y) <= 4) mns[r * g.cols + c] = 11; }
+  var e = B.deckExtent([0, 0], [1, 0], g, mnt, mns, 60);
+  near(e[0][0], -18, 1.5); near(e[1][0], 22, 1.5);
+  assert.equal(B.deckExtent([0, 15], [1, 0], g, mnt, mns, 60), null, 'pas de tablier ici');
+  assert.equal(B.deckExtent([0, 0], [1, 0], g, mnt, null, 60), null, 'sans MNS');
 });
 ok('contour d\'une composante : carré avec un coin manquant', function(){
   var w = 6, h = 6, lab = new Int32Array(w * h);
@@ -205,15 +239,6 @@ ok('découpe au rectangle : polygone et ligne', function(){
   var two = B.clipLine([[-5, 0], [30, 0], [30, 5], [5, 5]], rc);       // sort du bloc, y revient : deux morceaux
   assert.equal(two.length, 2);
 });
-ok('anneaux OSM : segments recousus, tampon autour d\'une ligne', function(){
-  var rings = B.stitchRings([[[0, 0], [1, 0], [1, 1]], [[1, 1], [0, 1], [0, 0]]]);
-  assert.equal(rings.length, 1); assert.equal(rings[0].length, 4);
-  near(B.polygonArea(rings[0]), 1, 1e-9);
-  var open = B.stitchRings([[[0, 0], [1, 0]], [[5, 5], [6, 6]]]);
-  assert.equal(open.length, 0);
-  var buf = B.bufferLine([[0, 0], [20, 0]], 3);
-  near(B.polygonArea(buf), 120, 1e-6);
-});
 ok('relief ombré : pente exposée au nord-ouest plus claire que celle exposée au sud-est', function(){
   var cols = 21, rows = 21, up = new Float32Array(cols * rows), down = new Float32Array(cols * rows);
   for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) { up[r * cols + c] = (c + r) * 0.5; down[r * cols + c] = -(c + r) * 0.5; }
@@ -227,52 +252,19 @@ ok('relief ombré : pente exposée au nord-ouest plus claire que celle exposée 
   assert.equal(nan.gray[0], 235);
 });
 
-// ---- OpenStreetMap ----
-ok('OSM : eau, forêt, route, pont convertis en mètres locaux et découpés au bloc', function(){
-  var F = B.frame(46.8, -71.2), ll = function(x, y){ var q = B.toLatLon(F, x, y); return { lat: q[0], lon: q[1] }; };
-  var rc = { x0: -100, y0: -100, x1: 100, y1: 100 };
-  var json = { elements: [
-    { type: 'way', tags: { natural: 'water', water: 'lake' }, geometry: [ll(-50, -50), ll(50, -50), ll(50, 50), ll(-50, 50), ll(-50, -50)] },
-    { type: 'way', tags: { landuse: 'forest' }, geometry: [ll(50, 50), ll(300, 50), ll(300, 300), ll(50, 300), ll(50, 50)] },
-    { type: 'way', tags: { highway: 'primary', bridge: 'yes', name: 'Pont X', lanes: '2' }, geometry: [ll(-150, 0), ll(150, 0)] },
-    { type: 'way', tags: { highway: 'footway' }, geometry: [ll(-50, 10), ll(50, 10)] },
-    { type: 'way', tags: { leisure: 'park' }, geometry: [ll(-90, 60), ll(-60, 60), ll(-60, 90), ll(-90, 90), ll(-90, 60)] },
-    { type: 'way', tags: { waterway: 'stream' }, geometry: [ll(-100, -90), ll(100, -90)] },
-    { type: 'way', tags: { waterway: 'river' }, geometry: [ll(-80, 0), ll(80, 0)] },                       // dans le lac : pas élargie
-    { type: 'relation', tags: { natural: 'water', type: 'multipolygon' }, members: [
-      { role: 'outer', geometry: [ll(60, -90), ll(90, -90), ll(90, -60)] }, { role: 'outer', geometry: [ll(90, -60), ll(60, -60), ll(60, -90)] },
-      { role: 'inner', geometry: [ll(70, -80), ll(75, -80), ll(75, -75)] } ] }
-  ] };
-  var R = B.osmToZones(json, F, rc), t = function(ty){ return R.zones.filter(function(z){ return z.type === ty; }); };
-  assert.equal(t('water').length + t('river').length, 3);                         // lac, relation, ruisseau tamponné (rivière dans le lac omise)
-  assert.equal(t('forest').length, 1);
-  near(B.polygonArea(t('forest')[0].polygon), 50 * 50, 1, 'forêt découpée à 100 m');
-  assert.equal(t('road').length, 1);                                              // le sentier (footway) n'est pas demandé mais l'élément reste ignoré
-  near(t('road')[0].width, 7, 1e-9);                                              // 2 voies × 3,5 m
-  assert.equal(t('road')[0].lanes, 2); assert.equal(t('road')[0].bridge, true);
-  assert.equal(t('grass').length, 1); near(B.polygonArea(t('grass')[0].polygon), 900, 1, 'parc OSM -> herbe');
-  assert.deepEqual(t('road')[0].line.map(function(p){ return Math.round(p[0]); }), [-100, 100]);
-  assert.equal(R.bridges.length, 1); assert.equal(R.bridges[0].name, 'Pont X');
-  assert.ok(R.zones.every(function(z){ return z.source === 'osm'; }));
-  var q = B.overpassQuery(46.79, -71.21, 46.81, -71.19);
-  var pk = B.buildPacket({ frame: F, grid: { cols: 2, rows: 2, cell: 1, x0: 0, y0: 1 }, mnt: new Float32Array(4), zones: R.zones });
-  var road = pk.zones.filter(function(z){ return z.type === 'road'; })[0];
-  assert.equal(road.lanes, 2); assert.equal(road.bridge, true); assert.equal(road.oneway, undefined);
-  assert.ok(pk.zones.some(function(z){ return z.type === 'grass' && z.polygon; }));
-  assert.deepEqual(B.validatePacket(pk), []);
-  assert.ok(/natural=water/.test(q) && /leisure=park/.test(q) && /highway~/.test(q) && /out geom/.test(q) && /46\.790000,-71\.210000,46\.810000,-71\.190000/.test(q));
-});
-ok('axe du pont proposé : tronçon « pont » OSM, sinon route, sinon est-ouest ; orienté ouest -> est', function(){
-  var bridges = [{ line: [[40, 12], [-40, 2]], name: null }], roads = [[[-100, 0], [100, 0]]];
-  var a = B.suggestAxis([0, 7], bridges, roads, 60);
-  assert.equal(a.from, 'osm-pont'); assert.ok(a.axis[0][0] < a.axis[1][0]);
-  near(Math.hypot(a.axis[1][0] - a.axis[0][0], a.axis[1][1] - a.axis[0][1]), Math.hypot(80, 10), 0.5);
-  var b = B.suggestAxis([0, 5], [], roads, 60);
-  assert.equal(b.from, 'osm-route'); assert.deepEqual(b.axis, [[-30, 0], [30, 0]]);
-  var c = B.suggestAxis([0, 0], [], [], 40);
+ok('axe du pont proposé : la route la plus proche, sinon est-ouest ; orienté ouest -> est ; cote d\'eau dans le paquet', function(){
+  var roads = [[[-100, 0], [100, 0]]];
+  var b = B.suggestAxis([0, 5], roads, 60);
+  assert.equal(b.from, 'route'); assert.deepEqual(b.axis, [[-30, 0], [30, 0]]); assert.deepEqual(b.at, [0, 0]);
+  var c = B.suggestAxis([0, 0], [], 40);
   assert.equal(c.from, 'defaut'); assert.deepEqual(c.axis, [[-20, 0], [20, 0]]);
-  var v = B.suggestAxis([0, 0], [], [[[3, 100], [3, -100]]], 40);                // route nord-sud : orientée vers le nord
+  var v = B.suggestAxis([0, 0], [[[3, 100], [3, -100]]], 40);                // route nord-sud : orientée vers le nord
   assert.ok(v.axis[0][1] < v.axis[1][1]);
+  assert.equal(B.suggestAxis([0, 200], roads, 60).from, 'defaut', 'route trop loin');
+  var pk = B.buildPacket({ frame: B.frame(46.8, -71.2), grid: { cols: 2, rows: 2, cell: 1, x0: 0, y0: 1 }, mnt: new Float32Array(4),
+    zones: [{ type: 'river', source: 'auto', polygon: [[0, 0], [1, 0], [1, 1]], level: 12.34 }, { type: 'forest', source: 'auto', polygon: [[0, 0], [1, 0], [1, 1]], level: 3 }] });
+  assert.equal(pk.zones[0].level, 12.34); assert.equal(pk.zones[1].level, undefined);
+  assert.deepEqual(B.validatePacket(pk), []);
 });
 
 console.log(n + ' essais Bloc 3D : ok');
