@@ -132,7 +132,7 @@ officiel en v0.7.1) et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR »,
 contrat `window.QA_MOD.lidar.open(o)`) ne sont chargés qu'à la première ouverture. Contrat : `window.QA_MOD[clé].render(o, body, ctx)` ; la page leur
 prête `window.QA` (échappement, formats, `fetchT` borné dans le temps corps compris, `loadScript`, `distM`, `det`).
 
-**Export 3D vers BridgeSketch 3D** (v0.7.2 ; onglet « Export 3D » depuis v0.7.4, à droite de « Ponts remarquables ») :
+**Export 3D vers BridgeSketch 3D** (v0.7.2 ; onglet « Export 3D » en v0.7.4 ; depuis v0.7.5 : dernier choix du menu « Exporter », bloc droit ou incliné (`C.blockFromCentre`, repère tourné `F.rot`), image en dalles jusqu'à 4 096 px, plus aucune route détectée (le masque CanVec n'oriente que l'axe du pont), envoi vers une fenêtre BridgeSketch 3D déjà ouverte par `BroadcastChannel('bs3d-terrain-link')` ou vers une nouvelle) :
 `js/bloc3d.js` (interface : sa propre carte satellite Leaflet dans `#view-export3d`, volet à droite, barre d'outils sur la
 carte), `js/bloc3d-calc.js` (fonctions pures, sans DOM ni réseau, testées par `tests/js/bloc3d_calc.mjs`) et `js/lidar.js`
 (GeoTIFF, WCS et Esri, exposés par `QA_MOD.lidar._geo` : `wcsBox(kind, bb, step, ms)`, `imgBox(bb, nw, nh, ms)`) sont chargés

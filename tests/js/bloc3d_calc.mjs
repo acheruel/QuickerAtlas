@@ -267,4 +267,68 @@ ok('axe du pont proposé : la route la plus proche, sinon est-ouest ; orienté o
   assert.deepEqual(B.validatePacket(pk), []);
 });
 
+// v0.7.5 : bloc incliné, herbe olive, attributs de zone, plus de routes dans les zones détectées
+ok('bloc incliné : repère tourné, coins, emprise et rééchantillonnage', function(){
+  var blk = B.blockFromCentre(46.8, -71.2, 600, 300, 30), F = blk.F;
+  // l'axe y du bloc pointe à l'azimut 30° : (0, 100) est à 50 m à l'est et 86,6 m au nord
+  var p = B.rotOut(F, 0, 100); near(p[0], 50, 1e-9); near(p[1], 86.60254, 1e-4);
+  var q = B.rotIn(F, p[0], p[1]); near(q[0], 0, 1e-9); near(q[1], 100, 1e-9);
+  var ll = B.toLatLon(F, 120, -40), back = B.toLocal(F, ll[0], ll[1]); near(back[0], 120, 1e-6); near(back[1], -40, 1e-6);
+  assert.ok(B.toLatLon(F, 0, 100)[0] > F.lat && B.toLatLon(F, 0, 100)[1] > F.lon, 'le haut du bloc part vers le nord-est');
+  var cs = B.blockCorners(blk);
+  assert.equal(cs.length, 4);
+  var a = B.toLocal(F, cs[0][0], cs[0][1]), c = B.toLocal(F, cs[2][0], cs[2][1]);
+  near(a[0], -300, 1e-6); near(a[1], -150, 1e-6); near(c[0], 300, 1e-6); near(c[1], 150, 1e-6);
+  // emprise nord-sud du bloc tourné : demi-côtés 300·cos30 + 150·sin30 et 300·sin30 + 150·cos30
+  var box = B.blockMercBox(blk, 4);
+  near(box.halfE, 300 * Math.cos(Math.PI / 6) + 150 * 0.5 + 4, 1e-6); near(box.halfN, 300 * 0.5 + 150 * Math.cos(Math.PI / 6) + 4, 1e-6);
+  near((box.box[2] - box.box[0]) / F.k, 2 * box.halfE, 1e-6);
+  assert.equal(B.blockFromCentre(46.8, -71.2, 10, 10, 190).rot, -170, 'angle ramené entre −180 et 180');
+  assert.equal(B.blockFromBounds(46.79, -71.21, 46.81, -71.19).rot, 0);
+  // rééchantillonnage : une source dont la valeur est « est + 2 × nord » se relit exactement dans le repère tourné
+  var w = 400, h = 400, sx = F.k, src = { a: new Float32Array(w * h), w: w, h: h, sx: sx, sy: sx, X0: F.cx - 200 * sx, Y0: F.cy + 200 * sx };
+  for (var r = 0; r < h; r++) for (var col = 0; col < w; col++) src.a[r * w + col] = (col + 0.5 - 200) + 2 * (200 - r - 0.5);
+  var g = B.gridFor(200, 100), out = B.resample(src, F, g), k = 30 * g.cols + 150, x = g.x0 + 150 * g.cell, y = g.y0 - 30 * g.cell, en = B.rotOut(F, x, y);
+  near(out[k], en[0] + 2 * en[1], 1e-3, 'valeur au bon endroit');
+  // sans rotation : même résultat qu'avant (repère nord en haut)
+  var F0 = B.frame(46.8, -71.2), o0 = B.resample(src, F0, g); near(o0[k], x + 2 * y, 1e-3);
+});
+ok('paquet v0.7.5 : rotation de la grille, attributs de route, densité ; herbe olive', function(){
+  var base = { frame: B.frame(46.8, -71.2), grid: { cols: 2, rows: 2, cell: 1, x0: 0, y0: 1 }, mnt: new Float32Array(4) };
+  var pk = B.buildPacket(Object.assign({ rotation: 27.456, zones: [
+    { type: 'road', source: 'user', line: [[0, 0], [5, 5]], width: 8, lanes: 3, traffic: false, barriers: 'both', link: false },
+    { type: 'road', source: 'user', line: [[0, 0], [5, 5]], width: 8, barriers: 'partout' },
+    { type: 'forest', source: 'user', polygon: [[0, 0], [1, 0], [1, 1]], density: 2.5 },
+    { type: 'grass', source: 'user', polygon: [[0, 0], [1, 0], [1, 1]], density: 9 },
+    { type: 'water', source: 'user', polygon: [[0, 0], [1, 0], [1, 1]], density: 2 }] }, base));
+  assert.equal(pk.grid.rotation, 27.46);
+  assert.deepEqual([pk.zones[0].traffic, pk.zones[0].barriers, pk.zones[0].link, pk.zones[0].lanes], [false, 'both', false, 3]);
+  assert.ok(!('traffic' in pk.zones[1]) && !('barriers' in pk.zones[1]) && !('link' in pk.zones[1]));
+  assert.deepEqual([pk.zones[2].density, pk.zones[3].density, pk.zones[4].density], [2.5, 3, undefined]);
+  assert.deepEqual(B.validatePacket(pk), []);
+  assert.equal(B.buildPacket(base).grid.rotation, undefined, 'pas de rotation : champ absent (lecteurs plus anciens)');
+  assert.equal(B.SOURCE, 'QuickerAtlas v0.7.5');
+  // herbe du 13741 sur l'imagerie : champ vert sombre, terre-plein, champ jauni ; pas l'asphalte, ni l'eau, ni un sol rouge
+  assert.ok(B.oliveGreen(98, 102, 69) && B.oliveGreen(83, 100, 59) && B.oliveGreen(128, 120, 94));
+  assert.ok(!B.oliveGreen(120, 120, 118) && !B.oliveGreen(40, 60, 90) && !B.oliveGreen(160, 110, 80) && !B.oliveGreen(20, 30, 12));
+  assert.equal(B.LIMITS.maxGrass, 12);
+});
+ok('détection v0.7.5 : pelouse jaunie détectée, routes jamais dans les zones (le masque ne sert qu\'à l\'axe)', function(){
+  var g = B.gridFor(200, 200), n2 = g.cols * g.rows, mnt = new Float32Array(n2), mns = new Float32Array(n2), i, x, y, W = 100, px = new Uint8ClampedArray(W * W * 4);
+  for (i = 0; i < n2; i++) { mnt[i] = 20 + 0.01 * (i % g.cols) + 0.02 * Math.sin(i * 0.37); mns[i] = mnt[i]; }
+  // image : moitié ouest en herbe jaunie, moitié est en asphalte gris
+  for (y = 0; y < W; y++) for (x = 0; x < W; x++) { var p = (y * W + x) * 4, grass = x < 50; px[p] = grass ? 128 : 120; px[p + 1] = grass ? 120 : 120; px[p + 2] = grass ? 94 : 118; px[p + 3] = 255; }
+  // masque de routes : une bande est-ouest
+  var mask = new Uint8ClampedArray(W * W * 4);
+  for (x = 2; x < W - 2; x++) for (y = 48; y < 52; y++) mask[(y * W + x) * 4 + 3] = 255;
+  var R = B.detect({ grid: g, img: { px: px, w: W, h: W }, mnt: mnt, mns: mns, roads: { px: mask, w: W, h: W } });
+  var grassZ = R.zones.filter(function(z){ return z.type === 'grass'; });
+  assert.equal(grassZ.length, 1, 'une pelouse');
+  near(B.polygonArea(grassZ[0].polygon), 100 * 200, 2500, 'la moitié ouest du bloc');
+  assert.ok(grassZ[0].polygon.every(function(q){ return q[0] <= 6; }), 'pas d\'herbe sur l\'asphalte');
+  assert.equal(R.zones.filter(function(z){ return z.type === 'road'; }).length, 0, 'aucune route dans les zones');
+  assert.ok(R.roads.length >= 1 && R.roads[0].line.length >= 2, 'les lignes du masque reviennent à part');
+  assert.equal(B.detect({ grid: g, img: { px: px, w: W, h: W }, mnt: mnt, mns: mns, roads: null }).roads.length, 0);
+});
+
 console.log(n + ' essais Bloc 3D : ok');

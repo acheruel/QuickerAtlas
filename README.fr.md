@@ -35,13 +35,13 @@ plus rapide à explorer.
   humides, zones inondables et espèces envahissantes à 1, 2 ou 5 km), aléa sismique du code national du bâtiment.
   **Climat futur** : températures et précipitations passées et futures à l’ouvrage (scénarios CMIP6 d’ECCC, référence
   1971-2000 ou 2021-2050).
-- **Export 3D** (v0.7.2, refait en v0.7.4) : l’onglet **Export 3D**, à droite de « Ponts remarquables », a sa propre carte
-  satellite. On choisit un ouvrage (n°, ou clic sur la carte) et un bloc de 1,5 km au plus ; en 5 secondes environ,
-  QuickerAtlas extrait le relief LiDAR 1 m (sol et surface), l’image satellite et les routes (CanVec de RNCan), et repère
-  peu de zones, mais justes : eau et forêt par le LiDAR (avec la cote de l’eau), herbe par l’image. Les zones se corrigent
-  sur la carte : clic ou Maj + clic, Maj + glisser pour en encadrer plusieurs, glisser pour déplacer, Suppr, Ctrl + Z.
-  Le pont existant est retiré du relief (sol continu dessous). Le bloc part vers BridgeSketch 3D, qui confirme chaque
-  étape, ou dans un fichier `.bs3dterrain` (format : [docs/bs3d-terrain-v1.md](docs/bs3d-terrain-v1.md)).
+- **Export vers BridgeSketch 3D** (v0.7.2, refait en v0.7.4, dans le menu **Exporter** depuis la v0.7.5) : dernier choix
+  du menu « Exporter ». La vue a sa propre carte satellite. On choisit un ouvrage (n°, ou clic sur la carte) et un bloc
+  de 1,5 km au plus, droit ou **incliné** (poignée ronde) ; en 5 à 10 secondes, QuickerAtlas extrait le relief LiDAR 1 m
+  (sol et surface) et l’image satellite (jusqu’à 4 096 px), et repère peu de zones, mais justes : eau et forêt par le
+  LiDAR (avec la cote de l’eau), herbe par l’image. Les routes ne sont plus détectées : on trace celles qui comptent.
+  Les zones se corrigent sur la carte : clic ou Maj + clic, Maj + glisser pour en encadrer plusieurs, glisser pour
+  déplacer, Suppr, Ctrl + Z. À l’envoi, on choisit une fenêtre BridgeSketch 3D déjà ouverte ou une nouvelle.
 
 Chaque vue garde ses filtres dans l’adresse : copiez le lien pour partager exactement ce que vous voyez.
 

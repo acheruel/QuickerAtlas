@@ -24,7 +24,7 @@ unique (Leaflet, sans build, sans clé d'API). En ligne : <https://acheruel.gith
 | `QuickerAtlas-vX.Y.Z-AAAA-MM-JJ.html` | Visualiseur courant (≈ 3 900 lignes, CSS + HTML + JS en un fichier) ; un seul à la racine |
 | `index.html` | **Copie identique** du fichier versionné (page servie par Pages) |
 | `js/lidar.js`, `js/hydro.js`, `js/sismique.js`, `js/environnement.js`, `js/climat.js` | Modules chargés à la demande (contrat `window.QA_MOD`) |
-| `js/bloc3d.js`, `js/bloc3d-calc.js` | Onglet « Export 3D » vers BridgeSketch 3D (v0.7.2, refait en v0.7.4) : carte satellite à part, bloc, extraction MNT/MNS + imagerie + routes CanVec (plus d'OSM), zones détectées par le LiDAR et modifiables (sélection multiple, glisser, Suppr, Ctrl + Z), pont existant retiré du relief, envoi avec accusé de réception ; `bloc3d-calc.js` = fonctions pures testées (`tests/js/bloc3d_calc.mjs`) ; contrat du paquet : `docs/bs3d-terrain-v1.md` |
+| `js/bloc3d.js`, `js/bloc3d-calc.js` | Export vers BridgeSketch 3D (v0.7.2, refait en v0.7.4 ; v0.7.5 : ouvert par le menu « Exporter », bloc incliné, image jusqu'à 4 096 px en dalles, plus de routes détectées, herbe olive, envoi vers une fenêtre BS3D déjà ouverte) : carte satellite à part, bloc, extraction MNT/MNS + imagerie + routes CanVec (plus d'OSM), zones détectées par le LiDAR et modifiables (sélection multiple, glisser, Suppr, Ctrl + Z), pont existant retiré du relief, envoi avec accusé de réception ; `bloc3d-calc.js` = fonctions pures testées (`tests/js/bloc3d_calc.mjs`) ; contrat du paquet : `docs/bs3d-terrain-v1.md` |
 | `sw.js` | Service Worker : cache des photos du MTMD (http(s) seulement) |
 | `etl/` | Pipeline Python (`python -m etl …`), un module par source ou couche |
 | `etl/donnees/` | Grilles versionnées (classes de site, masque d'eau) |
@@ -105,3 +105,6 @@ de centres de données (403) : ni GitHub Actions ni une session infonuagique ne 
 - Heredocs du shell Windows : accents abîmés → écrire les scripts d'édition avec un outil d'écriture de fichier.
 - Session infonuagique : Overpass, cdnjs et les serveurs du MTMD sont injoignables ; RNCan (WCS, WMS CanVec) et Esri répondent si leurs hôtes sont permis. Pour un essai au navigateur, servir Leaflet en local (voir rapport v0.7.4).
 - Le texte d'une demande peut citer un mauvais n° de structure : se fier aux captures d'écran.
+- Vue pleine largeur (`body.view-x3d`) : sa règle de grille doit battre `.workspace:not(.no-filters)` des largeurs ≤ 1100 px et ≥ 1500 px, sinon la vue reste dans la colonne des filtres et sa carte fait 0 px de large (carte absente de la v0.7.4 sur certains écrans). Tester à 1024 et 1600 px, pas seulement 1440 / 800 / 375.
+- Export d'image Esri : au-delà de 1 400 px de côté, demander en dalles parallèles (`imageTiles` de `js/bloc3d.js`) : 2 400 px d'un seul tenant prennent 25 s, en dalles 3 s.
+- Essai de l'envoi vers une fenêtre BridgeSketch 3D déjà ouverte : les deux applis doivent avoir la même origine (servir le dossier parent : `python -m http.server 8770 --directory ..`).

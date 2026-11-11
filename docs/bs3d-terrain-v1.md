@@ -56,6 +56,21 @@ zones portent `source: 'auto'` (eau et forêt détectées par le LiDAR, herbe pa
 existant des grilles : dans le couloir du tablier, le MNT est interpolé d'un bord à l'autre et le MNS ramené au sol. `'osm'`
 reste une valeur acceptée de `source` (fichiers plus anciens) ; `lanes`, `oneway` et `bridge` restent facultatifs.
 
+Ajouts compatibles de 2026-11-10 (QA v0.7.5, BS3D 0.7.1), toujours `version: 1` :
+- **Bloc incliné** : `grid.rotation` (degrés, sens horaire) = azimut de l'axe `y` de la grille. Absent = nord en haut. Le
+  repère du paquet est alors celui du bloc (`x` le long de sa largeur, `y` le long de sa hauteur) ; `center` reste le centre
+  du bloc. BS3D n'en tire que la flèche du nord et le cap affiché ; un lecteur plus ancien l'ignore sans dommage.
+- **Routes** : QA n'en détecte plus (elles se tracent, dans QA ou dans BS3D). Attributs facultatifs d'une route :
+  `lanes`, `oneway`, `traffic: false` (pas de véhicules), `barriers: 'left' | 'right' | 'both'` (glissières, côtés pris
+  dans le sens du tracé), `link: false` (ne prolonge jamais une approche de pont).
+- **Densité** : `density` (0,25 à 3, 1 par défaut) sur une zone `forest` ou `grass`.
+- **Image** : jusqu'à 4 096 px de côté (4 px par mètre au plus).
+- **Fenêtre déjà ouverte** : quand les deux applis ont la même origine, QA demande « qui est ouvert ? » sur le
+  `BroadcastChannel('bs3d-terrain-link')` : `{ type: 'bs3d-ping', ping: idQA }` ; chaque onglet BS3D répond
+  `{ type: 'bs3d-here', tab, ping, name, terrain }`. Le paquet part sur le même canal avec `to: tab`, `from: idQA` et
+  `transferId` ; l'accusé de réception revient avec `to: idQA`. Sinon QA réutilise la fenêtre qu'il a ouverte
+  (`window.open` au même nom, `#terrain-import`) ou en ouvre une nouvelle, au choix de l'utilisateur.
+
 ## Transport
 
 1. **BS3D ouvre QA** : bouton « IMPORT MNT/MNS » → `window.open(QA_URL + '?bs3d=1')`. QA en mode `bs3d` affiche un

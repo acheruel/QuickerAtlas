@@ -7,20 +7,46 @@
 (function(root){
   'use strict';
   var R = 6378137, MAX_CELLS = 1500000, MAX_SIDE = 1500;
-  var B = { R: R, MAX_CELLS: MAX_CELLS, MAX_SIDE: MAX_SIDE, SOURCE: 'QuickerAtlas v0.7.4' };
+  var B = { R: R, MAX_CELLS: MAX_CELLS, MAX_SIDE: MAX_SIDE, SOURCE: 'QuickerAtlas v0.7.5' };
 
   // ---------- Repère ----------
   B.merc = function(lat, lon){ return [lon * Math.PI / 180 * R, Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * R]; };
   B.unmerc = function(x, y){ return [(2 * Math.atan(Math.exp(y / R)) - Math.PI / 2) * 180 / Math.PI, x / R * 180 / Math.PI]; };
   // Repère local centré sur (lat, lon) : { lat, lon, cx, cy (Mercator du centre), k (m Mercator par m au sol) }
-  B.frame = function(lat, lon){ var m = B.merc(lat, lon); return { lat: lat, lon: lon, cx: m[0], cy: m[1], k: 1 / Math.cos(lat * Math.PI / 180) }; };
-  B.toLocal = function(F, lat, lon){ var m = B.merc(lat, lon); return [(m[0] - F.cx) / F.k, (m[1] - F.cy) / F.k]; };
-  B.toLatLon = function(F, x, y){ return B.unmerc(F.cx + x * F.k, F.cy + y * F.k); };
+  // v0.7.5 : `rot` (degrés, sens horaire) = azimut de l'axe y du repère. 0 : x vers l'est, y vers le nord. Un bloc incliné a
+  // son propre repère : x le long de sa largeur, y le long de sa hauteur. (est, nord) = x·(cos, −sin) + y·(sin, cos).
+  B.frame = function(lat, lon, rot){
+    var m = B.merc(lat, lon), a = (rot || 0) * Math.PI / 180;
+    return { lat: lat, lon: lon, cx: m[0], cy: m[1], k: 1 / Math.cos(lat * Math.PI / 180), rot: rot || 0, co: Math.cos(a), si: Math.sin(a) };
+  };
+  function cs(F){ return F.co === undefined ? [1, 0] : [F.co, F.si]; }
+  // (est, nord) en m au sol autour du centre -> repère du bloc, et l'inverse
+  B.rotIn = function(F, e, n){ var q = cs(F); return [e * q[0] - n * q[1], e * q[1] + n * q[0]]; };
+  B.rotOut = function(F, x, y){ var q = cs(F); return [x * q[0] + y * q[1], -x * q[1] + y * q[0]]; };
+  B.toLocal = function(F, lat, lon){ var m = B.merc(lat, lon); return B.rotIn(F, (m[0] - F.cx) / F.k, (m[1] - F.cy) / F.k); };
+  B.toLatLon = function(F, x, y){ var p = B.rotOut(F, x, y); return B.unmerc(F.cx + p[0] * F.k, F.cy + p[1] * F.k); };
+  // Bloc de wM × hM m centré sur (lat, lon), tourné de rot degrés (sens horaire, 0 = nord en haut)
+  B.blockFromCentre = function(lat, lon, wM, hM, rot){
+    rot = ((((rot || 0) + 180) % 360) + 360) % 360 - 180;
+    return { F: B.frame(lat, lon, rot), wM: wM, hM: hM, rot: rot };
+  };
+  // Coins du bloc en [lat, lon] : sud-ouest, nord-ouest, nord-est, sud-est du repère du bloc
+  B.blockCorners = function(blk){
+    var w = blk.wM / 2, h = blk.hM / 2;
+    return [[-w, -h], [-w, h], [w, h], [w, -h]].map(function(p){ return B.toLatLon(blk.F, p[0], p[1]); });
+  };
+  // Emprise Mercator [xmin, ymin, xmax, ymax] du bloc (tourné ou non), élargie de `margin` m au sol ; halfE, halfN = demi-côtés au sol
+  B.blockMercBox = function(blk, margin){
+    var w = blk.wM / 2, h = blk.hM / 2, F = blk.F, e = 0, n = 0;
+    [[-w, -h], [-w, h], [w, h], [w, -h]].forEach(function(p){ var q = B.rotOut(F, p[0], p[1]); e = Math.max(e, Math.abs(q[0])); n = Math.max(n, Math.abs(q[1])); });
+    e += margin || 0; n += margin || 0;
+    return { box: [F.cx - e * F.k, F.cy - n * F.k, F.cx + e * F.k, F.cy + n * F.k], halfE: e, halfN: n };
+  };
   // Cadre d'un rectangle de carte (sud, ouest, nord, est en degrés) : repère au centre (en Mercator) et dimensions au sol.
   B.blockFromBounds = function(s, w, n, e){
     var a = B.merc(s, w), b = B.merc(n, e), cm = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], c = B.unmerc(cm[0], cm[1]), F = B.frame(c[0], c[1]);
     F.cx = cm[0]; F.cy = cm[1];
-    return { F: F, wM: Math.abs(b[0] - a[0]) / F.k, hM: Math.abs(b[1] - a[1]) / F.k };
+    return { F: F, wM: Math.abs(b[0] - a[0]) / F.k, hM: Math.abs(b[1] - a[1]) / F.k, rot: 0 };
   };
   // Pas de la grille : 1 m tant que cols × rows ≤ 1,5 M, sinon 2 m (puis 3, 4… au besoin)
   B.chooseCell = function(wM, hM){
@@ -39,11 +65,13 @@
   // src = { a: Float32Array, w, h, sx, sy, X0, Y0 } (pixel (0,0) = coin nord-ouest en Mercator ; sx, sy > 0 en m Mercator).
   // Bilinéaire si les 4 voisins sont valides, sinon pixel le plus proche s'il est valide, sinon NaN.
   B.resample = function(src, F, g){
-    var out = new Float32Array(g.cols * g.rows), a = src.a, w = src.w, h = src.h, r, c;
+    var out = new Float32Array(g.cols * g.rows), a = src.a, w = src.w, h = src.h, r, c, q = cs(F), co = q[0], si = q[1];
     for (r = 0; r < g.rows; r++) {
-      var my = F.cy + (g.y0 - r * g.cell) * F.k, fr = (src.Y0 - my) / src.sy - 0.5, r0 = Math.floor(fr), tr = fr - r0;
+      var ly = g.y0 - r * g.cell;
       for (c = 0; c < g.cols; c++) {
-        var mx = F.cx + (g.x0 + c * g.cell) * F.k, fc = (mx - src.X0) / src.sx - 0.5, c0 = Math.floor(fc), tc = fc - c0, v = NaN;
+        // v0.7.5 : cellule (x, y) du repère du bloc -> (est, nord) -> Mercator (bloc incliné)
+        var lx = g.x0 + c * g.cell, my = F.cy + (-lx * si + ly * co) * F.k, fr = (src.Y0 - my) / src.sy - 0.5, r0 = Math.floor(fr), tr = fr - r0;
+        var mx = F.cx + (lx * co + ly * si) * F.k, fc = (mx - src.X0) / src.sx - 0.5, c0 = Math.floor(fc), tc = fc - c0, v = NaN;
         if (fc >= -0.5 && fr >= -0.5 && fc <= w - 0.5 && fr <= h - 0.5) {
           var ca = Math.max(0, Math.min(w - 1, c0)), cb = Math.max(0, Math.min(w - 1, c0 + 1)), ra = Math.max(0, Math.min(h - 1, r0)), rb = Math.max(0, Math.min(h - 1, r0 + 1));
           var v00 = a[ra * w + ca], v01 = a[ra * w + cb], v10 = a[rb * w + ca], v11 = a[rb * w + cb];
@@ -89,7 +117,8 @@
     return {
       type: 'bs3d-terrain', version: 1, source: o.source || B.SOURCE, created: o.created || new Date().toISOString(),
       center: { lat: o.frame.lat, lon: o.frame.lon },
-      grid: { cols: o.grid.cols, rows: o.grid.rows, cell: o.grid.cell, x0: o.grid.x0, y0: o.grid.y0 },
+      // v0.7.5 : bloc incliné : `rotation` (degrés, sens horaire) = azimut de l'axe y de la grille ; absent = nord en haut
+      grid: (function(){ var g = { cols: o.grid.cols, rows: o.grid.rows, cell: o.grid.cell, x0: o.grid.x0, y0: o.grid.y0 }; if (o.rotation) g.rotation = Math.round(o.rotation * 100) / 100; return g; })(),
       mnt: o.mnt, mns: o.mns || null, image: o.image || null,
       zones: (o.zones || []).map(function(z){
         var q = { type: z.type, source: z.source || 'user' };
@@ -99,11 +128,17 @@
           if (z.lanes > 0) q.lanes = Math.min(8, Math.round(z.lanes));
           if (z.oneway === 1 || z.oneway === -1) q.oneway = z.oneway;
           if (z.bridge) q.bridge = true;
+          // v0.7.5 : attributs d'une route tracée (lus par BridgeSketch 3D 0.7.1) : sans circulation, glissières, pas de raccord au pont
+          if (z.traffic === false) q.traffic = false;
+          if (z.barriers === 'left' || z.barriers === 'right' || z.barriers === 'both') q.barriers = z.barriers;
+          if (z.link === false) q.link = false;
         }
         else {
           q.polygon = z.polygon.map(function(p){ return [p[0], p[1]]; });
           // v0.7.4 : cote du plan d'eau lue dans le MNT (m, même référence que la grille)
           if ((z.type === 'water' || z.type === 'river') && typeof z.level === 'number' && isFinite(z.level)) q.level = z.level;
+          // v0.7.5 : densité de végétation d'une forêt ou d'une zone d'herbe (1 = normale, 0,25 à 3)
+          if ((z.type === 'forest' || z.type === 'grass') && typeof z.density === 'number' && isFinite(z.density) && z.density !== 1) q.density = Math.max(0.25, Math.min(3, z.density));
         }
         return q;
       }),
@@ -131,6 +166,7 @@
     else {
       n = g.cols * g.rows;
       if (n > MAX_CELLS) e.push('grid : plus de 1 500 000 cellules');
+      if (g.rotation !== undefined && !isNum(g.rotation)) e.push('grid.rotation');
     }
     if (n) {
       var lm = gridLen(p.mnt), ls = gridLen(p.mns);
@@ -268,6 +304,11 @@
   B.CLASS = K;
   // f = { r, g, b (0–255, moyenne de la cellule), tex (écart-type de la luminance dans la cellule), chm (hauteur MNS − MNT en m,
   // ou null sans MNS), nan (part de MNT sans donnée, 0–1) }
+  // v0.7.5 : vert olive ou jauni d'une herbe basse sur l'imagerie (hors saison, sèche) ; exclut les gris et les sols nus rouges
+  B.oliveGreen = function(r, g, b){
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    return g >= r - 10 && g - b >= 8 && mx > 0 && (mx - mn) / mx >= 0.10 && lum >= 45 && lum <= 200;
+  };
   B.classifyCell = function(f){
     var r = f.r, g = f.g, b = f.b, mx = Math.max(r, g, b), mn = Math.min(r, g, b), lum = 0.299 * r + 0.587 * g + 0.114 * b, sat = mx ? (mx - mn) / mx : 0;
     var hasChm = f.chm != null && isFinite(f.chm), chm = hasChm ? f.chm : 0, tex = f.tex || 0, nan = f.nan || 0;
@@ -364,7 +405,8 @@
   //   routes = lignes centrales du masque CanVec de RNCan (B.roadsFromMask), une requête d'image d'environ 1 s.
   // o = { grid (du paquet), img: { px (RGBA), w, h } | null, mnt, mns | null, roads: { px (RGBA), w, h } | null, dc? }
   // L'image et le masque couvrent l'emprise de la grille (bords des cellules). Renvoie { zones, dc, stats, G }.
-  B.LIMITS = { water: 300, forest: 1500, grass: 4000, maxForest: 10, maxGrass: 4, roadMin: 25 };
+  // v0.7.5 : herbe : surfaces dès 1 500 m², 12 au plus (4 000 m² et 4 en v0.7.4 : trop peu, contours trop grossiers)
+  B.LIMITS = { water: 300, forest: 1500, grass: 1500, maxForest: 10, maxGrass: 12, roadMin: 25 };
   function median(a){ if (!a.length) return NaN; a.sort(function(p, q){ return p - q; }); return a[a.length >> 1]; }
   function repeat(f, m, w, h, n){ for (var i = 0; i < n; i++) m = f(m, w, h); return m; }
   B.detect = function(o){
@@ -418,7 +460,9 @@
       if (low && kc === K.WATER) { mW[i] = 1; colW[i] = 1; }
       else if (flat >= 0.75 && !(f && (lum > 170 || (green && lum > 95)))) mW[i] = 1;
       else if (nan >= 0.6 && (!f || lum < 150)) { mW[i] = 1; colW[i] = 1; }
-      else if (f && green && lum >= 55 && (!hasC || chm < 0.8)) mG[i] = 1;
+      // v0.7.5 : herbe = végétation basse. Vert franc, ou vert olive / jauni (pelouse sèche, talus, champ fauché) : le vert
+      // dépasse le bleu d'au moins 8 et n'est pas plus de 10 sous le rouge ; ni gris (asphalte, béton), ni très sombre ou très clair.
+      else if (f && kc !== K.ROAD && (!hasC || chm < 0.8) && ((green && lum >= 55) || B.oliveGreen(f.r, f.g, f.b))) mG[i] = 1;
     }
     var zones = [], toL = function(q){ return [xmin + q[0] * dc, ymax - q[1] * dc]; };
     var ringOf = function(lb, c, fine){
@@ -493,16 +537,19 @@
       mm = repeat(dilate, mm, cols, rows, open);
       var lb = label(mm, cols, rows);
       lb.comps.filter(function(c){ return c.n * dc * dc >= minArea; }).sort(function(a, b){ return b.n - a.n; }).slice(0, maxN).forEach(function(c){
-        var poly = ringOf(lb, c, type === 'grass' ? 22 : 45);
+        var poly = ringOf(lb, c, type === 'grass' ? 40 : 45);
         if (poly && B.polygonArea(poly) >= minArea) { zones.push({ type: type, source: 'auto', polygon: poly }); stats[type]++; }
       });
     };
     areaZones(mF, 'forest', LIM.forest, LIM.maxForest, 2, 1);
     for (i = 0; i < N; i++) if (wOut[i]) { mF[i] = 0; mG[i] = 0; }
-    areaZones(mG, 'grass', LIM.grass, LIM.maxGrass, 1, 3);
-    // --- routes
-    if (o.roads) B.roadsFromMask(o.roads, { x0: xmin, y0: ymin, x1: xmin + W, y1: ymax }).forEach(function(r){ zones.push(r); stats.road++; });
-    return { zones: zones, dc: dc, stats: stats, G: G };
+    // v0.7.5 : fermeture d'un pas (un sentier ou une ombre ne coupe plus une pelouse, une route sépare toujours deux champs),
+    // ouverture d'un seul (les talus étroits restent ; trois pas en v0.7.4 les effaçaient)
+    areaZones(mG, 'grass', LIM.grass, LIM.maxGrass, 1, 1);
+    // --- routes : v0.7.5, plus aucune route détectée (tronçons interrompus, peu fiables) : l'utilisateur trace celles qui comptent.
+    // Le masque CanVec, s'il est fourni, ne sert qu'à orienter l'axe du pont : ses lignes reviennent à part (`roads`), jamais en zones.
+    var roads = o.roads ? B.roadsFromMask(o.roads, o.roadsRect || { x0: xmin, y0: ymin, x1: xmin + W, y1: ymax }) : [];
+    return { zones: zones, roads: roads, dc: dc, stats: stats, G: G };
   };
 
   // ---------- Routes : masque d'image (WMS CanVec) -> lignes centrales ----------

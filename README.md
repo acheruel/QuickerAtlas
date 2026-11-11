@@ -30,13 +30,13 @@ bridges, culverts, retaining walls and tunnels. The interface is in French, like
   flood zones and invasive species within 1, 2 or 5 km. The seismic tool shows the National Building Code hazard.
   The **future climate** tool shows temperature and precipitation changes at the structure (ECCC CMIP6 scenarios,
   reference 1971-2000 or 2021-2050).
-- **Export 3D** (v0.7.2, redone in v0.7.4): the **Export 3D** tab, to the right of "Ponts remarquables", has its own
-  satellite map. Pick a structure (number, or click it on the map) and a block of up to 1.5 km; in about 5 seconds
-  QuickerAtlas extracts the 1 m LiDAR terrain (ground and surface), the satellite image and the roads (NRCan CanVec), and
-  detects a few reliable zones: water and forest from the LiDAR (with the measured water level), grass from the image.
-  Zones are edited on the map: click or Shift + click, Shift + drag to frame several, drag to move, Delete, Ctrl + Z.
-  The existing bridge is removed from the terrain (continuous ground under it). The block goes to BridgeSketch 3D, which
-  confirms each step, or into a `.bs3dterrain` file (format: [docs/bs3d-terrain-v1.md](docs/bs3d-terrain-v1.md)).
+- **Export to BridgeSketch 3D** (v0.7.2, redone in v0.7.4, in the **Exporter** menu since v0.7.5): the last entry of
+  the "Exporter" menu. The view has its own satellite map. Pick a structure (number, or click it on the map) and a
+  block of up to 1.5 km, straight or **turned** (round handle); in 5 to 10 seconds QuickerAtlas extracts the 1 m LiDAR
+  terrain (ground and surface) and the satellite image (up to 4,096 px), and detects a few reliable zones: water and
+  forest from the LiDAR (with the measured water level), grass from the image. Roads are no longer detected: draw the
+  ones that matter. Zones are corrected on the map: click or Shift + click, Shift + drag to frame several, drag to
+  move, Delete, Ctrl + Z. When sending, choose a BridgeSketch 3D window that is already open, or a new one.
 
 Filters live in the URL, so copying the link shares exactly what you see.
 

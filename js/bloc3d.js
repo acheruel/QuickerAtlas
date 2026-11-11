@@ -4,6 +4,9 @@
    CanVec), puis envoie le tout à BridgeSketch 3D (postMessage ou fichier .bs3dterrain). Contrat : docs/bs3d-terrain-v1.md.
    v0.7.4 : plus d'OpenStreetMap (Overpass : 30 à 60 s et beaucoup de petites zones à supprimer) ; sélection multiple (clic,
    Maj + clic, cadre), déplacement à la souris, Suppr, Ctrl + Z.
+   v0.7.5 : ouvert par le menu « Exporter » ; bloc en rectangle incliné (poignée de rotation) ; image satellite jusqu'à 4 096 px ;
+   plus de routes détectées (l'utilisateur les trace ; CanVec n'oriente plus que l'axe du pont) ; herbe mieux détectée ; envoi vers
+   une fenêtre BridgeSketch 3D déjà ouverte ou vers une nouvelle, au choix.
    Module chargé à la demande (js/lidar.js et js/bloc3d-calc.js d'abord). Contrat : window.QA_MOD.bloc3d.show(host, o, opt).
    Les calculs purs sont dans js/bloc3d-calc.js (testés par tests/js/bloc3d_calc.mjs). ES5. */
 (function(){
@@ -21,7 +24,8 @@
   };
   var ORDER = ['river', 'water', 'forest', 'grass', 'road'];
   var S = { host: null, map: null, side: null, bar: null, o: null, bs3d: false, mode: 'select', rect: null, blk: null, grid: null, rectL: null, handles: [], drawing: false, run: 0,
-    data: null, zones: [], axis: null, axisSrc: null, sel: [], zl: {}, vh: [], tool: null, svg: null, nextId: 1, steps: [], status: null, sending: null, undo: [], box: false, dots: null, side0: 600, strip: true };
+    data: null, zones: [], axis: null, axisSrc: null, sel: [], zl: {}, vh: [], tool: null, svg: null, nextId: 1, steps: [], status: null, sending: null, undo: [], box: false, dots: null, side0: 600, strip: true,
+    rot0: 0, win: null, tabs: {}, bc: null, me: 'qa-' + Math.random().toString(36).slice(2, 10), ackCore: null };
   var $ = function(s){ return S.host.querySelector(s); };
 
   // ---------- Outils ----------
@@ -42,9 +46,10 @@
   function sizeText(){
     if (!S.blk) return 'Aucun bloc : choisissez une structure, une taille, ou dessinez un rectangle.';
     var g = S.grid;
-    return fmt(S.blk.wM) + ' × ' + fmt(S.blk.hM) + ' m · pas de ' + g.cell + ' m';
+    return fmt(S.blk.wM) + ' × ' + fmt(S.blk.hM) + ' m · pas de ' + g.cell + ' m' + (S.blk.rot ? ' · tourné de ' + fmt(S.blk.rot) + '°' : '');
   }
-  function setBlock(r){ S.rect = r; S.blk = C.blockFromBounds(r.s, r.w, r.n, r.e); S.grid = C.gridFor(S.blk.wM, S.blk.hM); }
+  // v0.7.5 : le bloc est un rectangle { lat, lon (centre), w, h (m au sol), rot (degrés, sens horaire ; 0 = nord en haut) }
+  function setBlock(r){ S.rect = r; S.blk = C.blockFromCentre(r.lat, r.lon, r.w, r.h, r.rot); S.grid = C.gridFor(S.blk.wM, S.blk.hM); }
   function pts(z){ return z.polygon || z.line; }
   function zoneById(id){ for (var i = 0; i < S.zones.length; i++) if (S.zones[i].id === id) return S.zones[i]; return null; }
   function isSel(id){ return S.sel.indexOf(id) >= 0; }
@@ -75,6 +80,9 @@
     L.DomEvent.disableClickPropagation(S.bar);
     document.addEventListener('keydown', onKey);
     wireMarquee();
+    // v0.7.5 : la carte suit toujours la taille de son cadre (mise en page tardive, fenêtre redimensionnée, volet replié)
+    if (window.ResizeObserver) new ResizeObserver(function(){ if (S.map && !S.host.hidden) S.map.invalidateSize({ animate: false }); }).observe($('#x3d-map'));
+    linkChannel();
   }
   // Structures du MTMD visibles (zoom ≥ 12) : un clic choisit l'ouvrage et place un bloc autour de lui
   function drawDots(){
@@ -96,7 +104,7 @@
   function setStructure(o, fly){
     S.o = o; S.status = null;
     showRect(squareAround(o.lat, o.lon, S.side0), true);
-    if (fly) S.map.fitBounds([[S.rect.s, S.rect.w], [S.rect.n, S.rect.e]], { padding: [60, 60], animate: false });
+    if (fly) S.map.fitBounds(rectBounds(S.rect), { padding: [60, 60], animate: false });
     render(); drawDots();
   }
 
@@ -139,9 +147,12 @@
       '<div class="x3d-f"><span class="x3d-lbl">Taille du bloc, centré ' + (o ? 'sur l’ouvrage' : 'sur la carte') + '</span><div class="x3d-seg">' +
       [300, 600, 1000, 1500].map(function(s){ var on = S.blk && Math.abs(S.blk.wM - s) < 2 && Math.abs(S.blk.hM - s) < 2; return '<button type="button" data-act="sq" data-s="' + s + '" aria-pressed="' + on + '">' + (s >= 1000 ? QA.nf1.format(s / 1000) + ' km' : s + ' m') + '</button>'; }).join('') + '</div>' +
       '<button type="button" class="x3d-link" data-act="draw" aria-pressed="' + S.drawing + '">' + (S.drawing ? 'Glissez sur la carte… (Échap pour annuler)' : 'ou dessiner un rectangle sur la carte') + '</button></div>' +
+      '<div class="x3d-f"><label for="x3d-rot">Rotation du bloc (degrés, sens horaire)</label><div class="x3d-row"><input id="x3d-rot" type="number" min="-180" max="180" step="1" value="' + Math.round(S.rect ? S.rect.rot : S.rot0) + '" data-act="rot" style="width:84px;flex:none">' +
+      '<button type="button" data-act="rot0"' + ((S.rect ? S.rect.rot : S.rot0) ? '' : ' disabled') + '>Nord en haut</button></div>' +
+      '<small class="x3d-note">Ou glissez la poignée ronde au-dessus du bloc : alignez-le sur la route ou la rivière.</small></div>' +
       '<p class="x3d-read" id="x3d-read" aria-live="polite">' + esc(sizeText()) + '</p>' +
       '<button type="button" class="x3d-pri x3d-big" data-act="extract"' + (S.rect ? '' : ' disabled') + '>Extraire le bloc</button>' +
-      '<p class="x3d-note">Environ 5 secondes. Le bloc se déplace par sa croix centrale et se redimensionne par ses coins (côté ≤ 1,5 km).</p>';
+      '<p class="x3d-note">Environ 10 secondes. Le bloc se déplace par sa croix centrale, se redimensionne par ses coins (côté ≤ 1,5 km) et se tourne par sa poignée ronde.</p>';
   }
   function busyHtml(){
     return '<p class="x3d-lead">Extraction du bloc de ' + esc(sizeText()) + '</p><ul class="x3d-prog">' + S.steps.map(function(s){
@@ -156,12 +167,13 @@
   }
   function axisText(){
     if (!S.axis) return 'Axe non placé : BridgeSketch 3D posera le pont au centre du bloc.';
-    var a = S.axis, dx = a[1][0] - a[0][0], dy = a[1][1] - a[0][1], az = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+    var a = S.axis, dx = a[1][0] - a[0][0], dy = a[1][1] - a[0][1], az = (Math.atan2(dx, dy) * 180 / Math.PI + (F().rot || 0) + 720) % 360;   // v0.7.5 : azimut vrai, bloc incliné compris
     return 'Longueur ' + QA.nf1.format(Math.hypot(dx, dy)) + ' m · azimut ' + fmt(az) + '°' + (S.axisSrc ? ' · ' + S.axisSrc : '');
   }
   function selectionHtml(){
     var zs = selZones(), n = zs.length;
-    if (!n) return '<p class="x3d-hint"><b>Cliquez</b> une zone pour la choisir, <b>Maj + clic</b> pour en ajouter. <b>Maj + glisser</b> (ou « Cadre de sélection ») en encadre plusieurs. Une zone choisie se <b>glisse</b> à la souris ; <b>Suppr</b> la supprime ; <b>Ctrl + Z</b> annule.</p>';
+    if (!n) return '<p class="x3d-hint"><b>Cliquez</b> une zone pour la choisir, <b>Maj + clic</b> pour en ajouter. <b>Maj + glisser</b> (ou « Cadre de sélection ») en encadre plusieurs. Une zone choisie se <b>glisse</b> à la souris ; <b>Suppr</b> la supprime ; <b>Ctrl + Z</b> annule.</p>' +
+      '<p class="x3d-hint"><b>Routes</b> : elles ne sont plus détectées. Tracez celles qui comptent (« + Tracer ») ; voies, circulation et glissières se règlent ensuite dans BridgeSketch 3D.</p>';
     var polys = zs.filter(function(z){ return z.polygon; }), roads = zs.filter(function(z){ return z.line; }), waters = zs.filter(function(z){ return z.type === 'water' || z.type === 'river'; });
     var h = '<div class="x3d-selbox"><b>' + (n === 1 ? TYPES[zs[0].type].name : plural(n, 'zone', 'zones') + ' choisies') + '</b>';
     if (n === 1) h += '<small>' + (zs[0].polygon ? fmt(C.polygonArea(zs[0].polygon)) + ' m²' : fmt(lineLen(zs[0].line)) + ' m') + ' · ' + pts(zs[0]).length + ' sommets · ' + (zs[0].source === 'user' ? 'modifiée à la main' : 'détectée') + '</small>';
@@ -189,7 +201,7 @@
       (isFinite(d.zmin) ? 'Altitude ' + QA.nf1.format(d.zmin) + ' à ' + QA.nf1.format(d.zmax) + ' m' : '') + '<br>' +
       'MNT ' + fmt(d.fin * 100) + ' % · ' + (d.mns ? 'MNS' : 'sans MNS') + ' · ' + (d.jpeg ? 'image' : 'sans image') + ' · ' + QA.nf1.format(d.seconds) + ' s</div></div>';
     if (d.warns.length) h += '<ul class="x3d-warns">' + d.warns.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>';
-    h += '<div class="x3d-sec"><div class="x3d-h">Zones détectées (' + S.zones.length + ')</div><ul class="x3d-fam">' + ORDER.map(function(k){
+    h += '<div class="x3d-sec"><div class="x3d-h">Zones du site (' + S.zones.length + ')</div><ul class="x3d-fam">' + ORDER.map(function(k){
       var zs = S.zones.filter(function(z){ return z.type === k; }), n = zs.length, on = n && zs.every(function(z){ return isSel(z.id); });
       return '<li class="' + (n ? '' : 'none') + '">' + swatch(k) + '<button type="button" class="x3d-famname" data-act="fam" data-t="' + k + '"' + (n ? '' : ' disabled') + ' aria-pressed="' + !!on + '" title="Sélectionner toutes les zones de ce type">' + TYPES[k].many + '</button><b>' + n + '</b>' +
         '<button type="button" data-act="add" data-t="' + k + '" title="Tracer une zone « ' + TYPES[k].name + ' » sur la carte">+ Tracer</button>' +
@@ -201,9 +213,18 @@
         '<small class="x3d-note">Les bouts A et B se glissent sur la carte : placez-les sur les deux culées.</small>' : '') + '</div>';
     return h;
   }
+  // v0.7.5 : si une fenêtre BridgeSketch 3D est déjà ouverte, on propose d'y envoyer le bloc, ou d'en ouvrir une nouvelle
   function footHtml(){
-    return '<div class="x3d-foot"><button type="button" class="x3d-pri x3d-big" data-act="send"' + (S.sending ? ' disabled' : '') + '>Envoyer vers BridgeSketch 3D</button>' +
-      '<div class="x3d-row"><button type="button" data-act="download">Télécharger le fichier</button><button type="button" data-act="again">Nouveau bloc</button></div></div>';
+    var dis = S.sending ? ' disabled' : '', t = targets(), h = '<div class="x3d-foot">';
+    if (S.bs3d && window.opener && !window.opener.closed) h += '<button type="button" class="x3d-pri x3d-big" data-act="send"' + dis + '>Envoyer vers BridgeSketch 3D</button>';
+    else if (t.length) {
+      h += '<div class="x3d-h">BridgeSketch 3D est déjà ouvert</div>';
+      t.forEach(function(x, i){
+        h += '<button type="button" class="x3d-pri x3d-big" data-act="sendto" data-i="' + i + '"' + dis + '>Envoyer à la fenêtre ouverte<small class="x3d-tgt">' + esc(x.label) + '</small></button>';
+      });
+      h += '<button type="button" data-act="sendnew"' + dis + '>Ouvrir une nouvelle fenêtre BridgeSketch 3D</button>';
+    } else h += '<button type="button" class="x3d-pri x3d-big" data-act="sendnew"' + dis + '>Envoyer vers BridgeSketch 3D</button>';
+    return h + '<div class="x3d-row"><button type="button" data-act="download">Télécharger le fichier</button><button type="button" data-act="again">Nouveau bloc</button></div></div>';
   }
   function status(kind, html){ S.status = html ? { kind: kind, html: html } : null; render(); }
   function drawThumb(){
@@ -218,27 +239,33 @@
   }
 
   // ---------- Rectangle du bloc ----------
-  function rectFrom(a, p){
-    var am = C.merc(a.lat, a.lng), pm = C.merc(p.lat, p.lng), kk = 1 / Math.cos((a.lat + p.lat) / 2 * Math.PI / 180), lim = C.MAX_SIDE * kk;
-    var dx = Math.max(-lim, Math.min(lim, pm[0] - am[0])), dy = Math.max(-lim, Math.min(lim, pm[1] - am[1])), q = C.unmerc(am[0] + dx, am[1] + dy), A = C.unmerc(am[0], am[1]);
-    return { s: Math.min(A[0], q[0]), n: Math.max(A[0], q[0]), w: Math.min(A[1], q[1]), e: Math.max(A[1], q[1]) };
+  // Rectangle dont a et p (lat/lng) sont deux coins opposés, dans le repère tourné de `rot` degrés ; côtés bornés à 1,5 km
+  function rectFrom(a, p, rot){
+    var F = C.frame(a.lat, a.lng, rot), q = C.toLocal(F, p.lat, p.lng), lim = C.MAX_SIDE;
+    var dx = Math.max(-lim, Math.min(lim, q[0])), dy = Math.max(-lim, Math.min(lim, q[1])), c = C.toLatLon(F, dx / 2, dy / 2);
+    return { lat: c[0], lon: c[1], w: Math.abs(dx), h: Math.abs(dy), rot: rot || 0 };
   }
-  function squareAround(lat, lon, side){
-    var m = C.merc(lat, lon), k = 1 / Math.cos(lat * Math.PI / 180), h = side / 2 * k, a = C.unmerc(m[0] - h, m[1] - h), b = C.unmerc(m[0] + h, m[1] + h);
-    return { s: a[0], w: a[1], n: b[0], e: b[1] };
+  function squareAround(lat, lon, side){ return { lat: lat, lon: lon, w: side, h: side, rot: S.rot0 }; }
+  function corners(r){ return C.blockCorners(C.blockFromCentre(r.lat, r.lon, r.w, r.h, r.rot)); }
+  function rectBounds(r){ return L.latLngBounds(corners(r)); }
+  // Poignée de rotation : au-dessus du milieu du côté haut du bloc
+  function rotPoint(r){ return C.toLatLon(C.frame(r.lat, r.lon, r.rot), 0, r.h / 2 + Math.max(18, 0.1 * Math.max(r.w, r.h))); }
+  function setRot(deg){
+    deg = ((((deg || 0) + 180) % 360) + 360) % 360 - 180;
+    S.rot0 = deg;
+    if (S.rect) showRect({ lat: S.rect.lat, lon: S.rect.lon, w: S.rect.w, h: S.rect.h, rot: deg }, true);
   }
-  function corners(r){ return [[r.s, r.w], [r.n, r.w], [r.n, r.e], [r.s, r.e]]; }
   function readout(){
     var el = $('#x3d-read'); if (el) el.textContent = sizeText();
     if (S.rectL) S.rectL.setTooltipContent(fmt(S.blk.wM) + ' × ' + fmt(S.blk.hM) + ' m');
   }
   function showRect(r, editable){
     setBlock(r);
-    var b = [[r.s, r.w], [r.n, r.e]];
+    var b = corners(r);
     if (!S.rectL) {
-      S.rectL = L.rectangle(b, { pane: 'x3dPane', renderer: S.svg, color: '#fff', weight: 2.5, dashArray: '8 5', fillColor: '#fff', fillOpacity: 0.06, interactive: false }).addTo(S.map);
-      S.rectL.bindTooltip('', { permanent: true, direction: 'top', className: 'b3d-tip', offset: [0, -2] });
-    } else S.rectL.setBounds(b);
+      S.rectL = L.polygon(b, { pane: 'x3dPane', renderer: S.svg, color: '#fff', weight: 2.5, dashArray: '8 5', fillColor: '#fff', fillOpacity: 0.06, interactive: false }).addTo(S.map);
+      S.rectL.bindTooltip('', { permanent: true, direction: 'center', className: 'b3d-tip', offset: [0, 0] });
+    } else S.rectL.setLatLngs(b);
     handles(editable ? r : null);
     readout();
     var bt = $('[data-act=extract]'); if (bt) bt.disabled = false;
@@ -252,25 +279,41 @@
     cs.forEach(function(c, i){
       var m = L.marker(c, { draggable: true, icon: icon('b3d-hc'), keyboard: false, title: 'Glisser pour redimensionner', zIndexOffset: 800 }).addTo(S.map);
       m.on('drag', function(){
-        var o = cs[(i + 2) % 4], nr = rectFrom({ lat: o[0], lng: o[1] }, m.getLatLng());
-        setBlock(nr); S.rectL.setBounds([[nr.s, nr.w], [nr.n, nr.e]]); readout();
-        corners(nr).forEach(function(cc, j){ if (j !== i) S.handles[j].setLatLng(cc); });
-        S.handles[4].setLatLng([(nr.s + nr.n) / 2, (nr.w + nr.e) / 2]);
+        // le coin opposé reste fixe ; le rectangle garde son inclinaison
+        var o = cs[(i + 2) % 4], nr = rectFrom({ lat: o[0], lng: o[1] }, m.getLatLng(), r.rot);
+        setBlock(nr); S.rectL.setLatLngs(corners(nr)); readout();
+        for (var j = 0; j < 4; j++) if (j !== i && j !== (i + 2) % 4) S.handles[j].setLatLng(nearestCorner(nr, S.handles[j].getLatLng()));
+        S.handles[4].setLatLng([nr.lat, nr.lon]); S.handles[5].setLatLng(rotPoint(nr));
       });
       m.on('dragend', function(){ showRect(S.rect, true); render(); });
       S.handles.push(m);
     });
-    var mv = L.marker([(r.s + r.n) / 2, (r.w + r.e) / 2], { draggable: true, icon: icon('b3d-hm'), keyboard: false, title: 'Glisser pour déplacer le bloc', zIndexOffset: 800 }).addTo(S.map), start = null;
-    mv.on('dragstart', function(){ var c = mv.getLatLng(); start = { m: C.merc(c.lat, c.lng), r: S.rect }; });
+    var mv = L.marker([r.lat, r.lon], { draggable: true, icon: icon('b3d-hm'), keyboard: false, title: 'Glisser pour déplacer le bloc', zIndexOffset: 800 }).addTo(S.map);
     mv.on('drag', function(){
-      var c = mv.getLatLng(), cm = C.merc(c.lat, c.lng), dx = cm[0] - start.m[0], dy = cm[1] - start.m[1], r0 = start.r;
-      var a = C.merc(r0.s, r0.w), b = C.merc(r0.n, r0.e), A = C.unmerc(a[0] + dx, a[1] + dy), Bq = C.unmerc(b[0] + dx, b[1] + dy);
-      var nr = { s: A[0], w: A[1], n: Bq[0], e: Bq[1] };
-      setBlock(nr); S.rectL.setBounds([[nr.s, nr.w], [nr.n, nr.e]]);
+      var c = mv.getLatLng(), nr = { lat: c.lat, lon: c.lng, w: S.rect.w, h: S.rect.h, rot: S.rect.rot };
+      setBlock(nr); S.rectL.setLatLngs(corners(nr));
       corners(nr).forEach(function(cc, j){ S.handles[j].setLatLng(cc); });
+      S.handles[5].setLatLng(rotPoint(nr));
     });
     mv.on('dragend', function(){ showRect(S.rect, true); });
     S.handles.push(mv);
+    // v0.7.5 : poignée de rotation. L'angle se lit du centre vers la poignée ; il s'aimante sur 0, 90, 180 et 270° à 3° près.
+    var rt = L.marker(rotPoint(r), { draggable: true, icon: icon('b3d-hr'), keyboard: false, title: 'Glisser pour tourner le bloc', zIndexOffset: 850 }).addTo(S.map);
+    rt.on('drag', function(){
+      var F0 = C.frame(S.rect.lat, S.rect.lon, 0), p = rt.getLatLng(), q = C.toLocal(F0, p.lat, p.lng), deg = Math.atan2(q[0], q[1]) * 180 / Math.PI, snap = Math.round(deg / 90) * 90;
+      if (Math.abs(deg - snap) < 3) deg = snap; else deg = Math.round(deg);
+      if (deg === 180) deg = -180;
+      var nr = { lat: S.rect.lat, lon: S.rect.lon, w: S.rect.w, h: S.rect.h, rot: deg };
+      S.rot0 = deg; setBlock(nr); S.rectL.setLatLngs(corners(nr)); readout();
+      corners(nr).forEach(function(cc, j){ S.handles[j].setLatLng(cc); });
+    });
+    rt.on('dragend', function(){ showRect(S.rect, true); render(); });
+    S.handles.push(rt);
+  }
+  function nearestCorner(r, ll0){
+    var best = null, bd = Infinity;
+    corners(r).forEach(function(c){ var d = Math.pow(c[0] - ll0.lat, 2) + Math.pow((c[1] - ll0.lng) * Math.cos(c[0] * Math.PI / 180), 2); if (d < bd) { bd = d; best = c; } });
+    return best;
   }
   function startDrawRect(){
     var map = S.map, c = map.getContainer(), a = null;
@@ -282,11 +325,11 @@
       a = pos(e); e.preventDefault(); e.stopPropagation();
       try { c.setPointerCapture(e.pointerId); } catch (x) { /* capture indisponible */ }
     };
-    var move = function(e){ if (a) showRect(rectFrom(a, pos(e)), false); };
+    var move = function(e){ if (a) showRect(rectFrom(a, pos(e), S.rot0), false); };
     var up = function(e){
       if (!a) return;
-      var r = rectFrom(a, pos(e)); a = null;
-      if (C.merc(r.n, r.e)[0] - C.merc(r.s, r.w)[0] < 20 || C.merc(r.n, r.e)[1] - C.merc(r.s, r.w)[1] < 20) {     // simple clic : annulé
+      var r = rectFrom(a, pos(e), S.rot0); a = null;
+      if (r.w < 20 || r.h < 20) {     // simple clic : annulé
         if (S.rectL) { S.map.removeLayer(S.rectL); S.rectL = null; }
         S.rect = null; S.blk = null; endDrawRect(true); return;
       }
@@ -322,16 +365,52 @@
     if (S.mode === 'busy') render();
   }
   function errText(e){ return e && e.name === 'AbortError' ? 'délai dépassé' : (e && e.message) || 'réseau'; }
+  // v0.7.5 : image du bloc incliné. L'image reçue (nord en haut) couvre l'emprise du bloc tourné ; on la redresse dans le repère
+  // du bloc, à la même finesse. Renvoie { px, w, h, dataUrl }.
+  function turnImage(im, blk, halfE, halfN){
+    var ps = im.w / (2 * halfE), cv = document.createElement('canvas'), g;
+    cv.width = Math.max(64, Math.round(blk.wM * ps)); cv.height = Math.max(64, Math.round(blk.hM * ps));
+    g = cv.getContext('2d');
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    g.translate(cv.width / 2, cv.height / 2);
+    g.rotate(-blk.rot * Math.PI / 180);
+    var cvs = document.createElement('canvas'); cvs.width = im.w; cvs.height = im.h;
+    cvs.getContext('2d').putImageData(new ImageData(im.px, im.w, im.h), 0, 0);
+    g.drawImage(cvs, -im.w / 2, -im.h / 2);
+    return { px: g.getImageData(0, 0, cv.width, cv.height).data, w: cv.width, h: cv.height, dataUrl: cv.toDataURL('image/jpeg', 0.9) };
+  }
+  // Image de l'emprise bb (Mercator) en nw × nh pixels. Au-delà de 1 400 px de côté, l'export d'Esri devient lent (25 s pour
+  // 2 400 px d'un seul tenant) : l'image est demandée en dalles d'au plus 1 400 px, en parallèle, puis assemblée.
+  function imageTiles(bb, nw, nh, ms){
+    var nx = Math.ceil(nw / 1400), ny = Math.ceil(nh / 1400);
+    if (nx * ny === 1) return GEO.imgBox(bb, nw, nh, ms);
+    var cv = document.createElement('canvas'), g, jobs = [], i, j;
+    cv.width = nw; cv.height = nh; g = cv.getContext('2d');
+    for (j = 0; j < ny; j++) for (i = 0; i < nx; i++) (function(i, j){
+      var px0 = Math.round(i * nw / nx), px1 = Math.round((i + 1) * nw / nx), py0 = Math.round(j * nh / ny), py1 = Math.round((j + 1) * nh / ny);
+      var x0 = bb[0] + (bb[2] - bb[0]) * px0 / nw, x1 = bb[0] + (bb[2] - bb[0]) * px1 / nw, y1 = bb[3] - (bb[3] - bb[1]) * py0 / nh, y0 = bb[3] - (bb[3] - bb[1]) * py1 / nh;
+      jobs.push(GEO.imgBox([x0, y0, x1, y1], px1 - px0, py1 - py0, ms).then(function(t){
+        var c = document.createElement('canvas'); c.width = t.w; c.height = t.h;
+        c.getContext('2d').putImageData(new ImageData(t.px, t.w, t.h), 0, 0);
+        g.drawImage(c, px0, py0, px1 - px0, py1 - py0);
+      }));
+    })(i, j);
+    return Promise.all(jobs).then(function(){
+      return { px: g.getImageData(0, 0, nw, nh).data, w: nw, h: nh, dataUrl: cv.toDataURL('image/jpeg', 0.9) };
+    });
+  }
   function extract(){
     var run = ++S.run, blk = S.blk, F_ = blk.F, grid = S.grid, k = F_.k, warns = [];
-    var hx = grid.cols * grid.cell / 2 * k, hy = grid.rows * grid.cell / 2 * k, bbImg = [F_.cx - hx, F_.cy - hy, F_.cx + hx, F_.cy + hy], mg = 4 * k;
-    var bbDem = [bbImg[0] - mg, bbImg[1] - mg, bbImg[2] + mg, bbImg[3] + mg], stepM = grid.cell * k;
-    var W = grid.cols * grid.cell, H = grid.rows * grid.cell, sc = Math.min(2048 / Math.max(W, H), 2), nw = Math.max(64, Math.round(W * sc)), nh = Math.max(64, Math.round(H * sc));
+    // emprises Mercator : celle du bloc (image, masque des routes) et la même élargie de 4 m (LiDAR) ; un bloc incliné demande
+    // le rectangle nord-sud qui le contient
+    var bi = C.blockMercBox(blk, 0), bbImg = bi.box, bbDem = C.blockMercBox(blk, 4).box, stepM = grid.cell * k;
+    // v0.7.5 : image jusqu'à 4 096 px de côté et 4 px par mètre (2 048 px et 2 px/m en v0.7.4 : texture grossière dans BridgeSketch 3D)
+    var Wa = 2 * bi.halfE, Ha = 2 * bi.halfN, sc = Math.min(4096 / Math.max(Wa, Ha), 4), nw = Math.max(64, Math.round(Wa * sc)), nh = Math.max(64, Math.round(Ha * sc));
     S.steps = [
       { id: 'dtm', label: 'Sol : MNT LiDAR 1 m (RNCan)', state: 'run' },
       { id: 'dsm', label: 'Surface : MNS LiDAR (arbres, tabliers)', state: 'wait' },
       { id: 'img', label: 'Image satellite (Esri)', state: 'run' },
-      { id: 'road', label: 'Routes (CanVec, RNCan)', state: 'run' },
+      { id: 'road', label: 'Direction de la route, pour l’axe du pont (CanVec)', state: 'run' },
       { id: 'calc', label: 'Détection des zones', state: 'wait' }
     ];
     S.mode = 'busy'; S.status = null; clearZoneLayers(); handles(null); S.dots.clearLayers(); render();
@@ -343,10 +422,12 @@
     var tMns = tDem.then(function(){ step('dsm', 'run'); return wait(1000); }).then(function(){ return GEO.wcsBox('dsm', bbDem, stepM, 90000); }).then(function(t){
       step('dsm', 'ok', t.w + ' × ' + t.h + ' pixels'); return t;
     }, function(e){ step('dsm', 'warn', 'indisponible (' + errText(e) + ')'); warns.push('MNS indisponible : forêts détectées par la couleur seule, moins sûrement.'); return null; });
-    var tImg = GEO.imgBox(bbImg, nw, nh, 40000).then(function(im){ step('img', 'ok', im.w + ' × ' + im.h + ' pixels'); return im; },
-      function(e){ step('img', 'warn', 'indisponible (' + errText(e) + ')'); warns.push('Image satellite indisponible : pas d’herbe détectée, ni d’image dans le paquet.'); return null; });
-    var tRoad = roadMask(bbImg, Math.min(1500, Math.round(W)), Math.min(1500, Math.round(H)), 15000).then(function(m){ step('road', 'ok'); return m; },
-      function(e){ step('road', 'warn', 'indisponibles (' + errText(e) + ')'); warns.push('Routes CanVec indisponibles : tracez les routes utiles à la main (« + Tracer »).'); return null; });
+    var tImg = imageTiles(bbImg, nw, nh, 45000).then(function(im){
+      if (blk.rot) { var t = turnImage(im, blk, bi.halfE, bi.halfN); im = { px: t.px, w: t.w, h: t.h, dataUrl: t.dataUrl }; }
+      step('img', 'ok', im.w + ' × ' + im.h + ' pixels'); return im;
+    }, function(e){ step('img', 'warn', 'indisponible (' + errText(e) + ')'); warns.push('Image satellite indisponible : pas d’herbe détectée, ni d’image dans le paquet.'); return null; });
+    var tRoad = roadMask(bbImg, Math.min(1500, Math.round(Wa)), Math.min(1500, Math.round(Ha)), 15000).then(function(m){ step('road', 'ok'); m.halfE = bi.halfE; m.halfN = bi.halfN; return m; },
+      function(e){ step('road', 'warn', 'indisponible (' + errText(e) + ')'); warns.push('Routes CanVec indisponibles : l’axe du pont est proposé est-ouest, à ajuster.'); return null; });
     Promise.all([tDem, tMns, tImg, tRoad]).then(function(r){
       if (run !== S.run) return;
       step('calc', 'run'); return wait(30).then(function(){ return finish(run, r[0], r[1], r[2], r[3], warns, t0); });
@@ -357,22 +438,30 @@
       status('err', 'Échec de l’extraction : ' + esc(errText(e)) + '. Réessayez ou choisissez un bloc plus petit.');
     });
   }
+  // Lignes des routes CanVec dans le repère du bloc (le masque est nord en haut, centré sur le bloc) : pour l'axe du pont seulement
+  function axisRoads(mask, F_){
+    if (!mask) return [];
+    return C.roadsFromMask(mask, { x0: -mask.halfE, y0: -mask.halfN, x1: mask.halfE, y1: mask.halfN }).map(function(r){
+      return r.line.map(function(p){ return C.rotIn(F_, p[0], p[1]); });
+    });
+  }
   function finish(run, dem, dsm, im, mask, warns, t0){
     if (run !== S.run) return;
     var F_ = S.blk.F, grid = S.grid, hw = grid.cols * grid.cell / 2, hh = grid.rows * grid.cell / 2;
     var mnt = C.resample(dem, F_, grid), mns = dsm ? C.resample(dsm, F_, grid) : null, fin = C.finiteFraction(mnt);
     if (fin < 0.2) throw new Error('le MNT ne couvre pas ce bloc');
-    var det = C.detect({ grid: grid, img: im ? { px: im.px, w: im.w, h: im.h } : null, mnt: mnt, mns: mns, roads: mask });
+    // v0.7.5 : aucune route détectée (l'utilisateur les trace) ; les lignes CanVec ne servent qu'à orienter l'axe
+    var det = C.detect({ grid: grid, img: im ? { px: im.px, w: im.w, h: im.h } : null, mnt: mnt, mns: mns, roads: null });
+    var hint = axisRoads(mask, F_);
     var zones = det.zones.map(function(z){
       var q = { id: S.nextId++, type: z.type, source: z.source };
-      if (z.type === 'road') { q.line = z.line; q.width = z.width; } else { q.polygon = z.polygon; if (z.level != null) q.level = z.level; }
+      q.polygon = z.polygon; if (z.level != null) q.level = z.level;
       return q;
     });
     var zmin = Infinity, zmax = -Infinity;
     for (var i = 0; i < mnt.length; i++) { var v = mnt[i]; if (v < zmin) zmin = v; if (v > zmax) zmax = v; }
-    var jpeg = im && im.buf ? 'data:image/jpeg;base64,' + C.bytesToB64(new Uint8Array(im.buf)) : null;
+    var jpeg = im && im.dataUrl ? im.dataUrl : im && im.buf ? 'data:image/jpeg;base64,' + C.bytesToB64(new Uint8Array(im.buf)) : null;
     var attribution = ['MNEHR 1 m © RNCan (OGL-Canada)'];
-    if (mask) attribution.push('CanVec © RNCan (OGL-Canada)');
     if (jpeg) attribution.push('Esri World Imagery');
     S.data = { F: F_, grid: grid, mnt: mnt, mns: mns, jpeg: jpeg, fin: fin, zmin: zmin, zmax: zmax, hs: C.hillshade(mnt, grid.cols, grid.rows, grid.cell, 340),
       attribution: attribution, warns: warns, det: det.stats, seconds: (performance.now() - t0) / 1000 };
@@ -382,7 +471,7 @@
     if (S.o && S.o.lat != null) {
       var p = C.toLocal(F_, S.o.lat, S.o.lon);
       if (Math.abs(p[0]) <= hw && Math.abs(p[1]) <= hh) {
-        var len = Math.max(15, Math.min(400, S.o.long || 60)), roads = zones.filter(function(z){ return z.line; }).map(function(z){ return z.line; });
+        var len = Math.max(15, Math.min(400, S.o.long || 60)), roads = hint;
         var sg = C.suggestAxis(p, roads, len, 80), deck = sg.from === 'route' ? C.deckExtent(sg.at, sg.dir, grid, mnt, mns, Math.max(60, len)) : null;
         // le tablier lu dans le MNS n'est retenu que s'il est cohérent avec la longueur connue de l'ouvrage (entre la moitié et le double)
         var dl = deck ? Math.hypot(deck[1][0] - deck[0][0], deck[1][1] - deck[0][1]) : 0;
@@ -394,8 +483,8 @@
     S.mode = 'edit'; S.status = null;
     S.rectL.closeTooltip();
     drawZones(); drawAxis(); drawStructure();
-    S.map.fitBounds([[S.rect.s, S.rect.w], [S.rect.n, S.rect.e]], { padding: [30, 30], animate: false });
-    render();
+    S.map.fitBounds(rectBounds(S.rect), { padding: [30, 30], animate: false });
+    render(); ping();
   }
 
   // ---------- Zones sur la carte ----------
@@ -537,12 +626,13 @@
         var x = m.clientX - r.left, y = m.clientY - r.top;
         S.justDragged = true; setTimeout(function(){ S.justDragged = false; }, 50);
         if (Math.abs(x - a.x) < 5 && Math.abs(y - a.y) < 5) { a = null; return; }
-        var p1 = loc(S.map.containerPointToLatLng([Math.min(a.x, x), Math.max(a.y, y)])), p2 = loc(S.map.containerPointToLatLng([Math.max(a.x, x), Math.min(a.y, y)]));
-        var rc = { x0: p1[0], y0: p1[1], x1: p2[0], y1: p2[1] };
+        // v0.7.5 : comparaison en pixels d'écran (le repère d'un bloc incliné n'est pas parallèle au cadre)
+        var rc = { x0: Math.min(a.x, x), y0: Math.min(a.y, y), x1: Math.max(a.x, x), y1: Math.max(a.y, y) };
+        var scr = function(p){ var q = S.map.latLngToContainerPoint(ll(p)); return [q.x, q.y]; };
         // une zone est prise si le cadre touche son tracé (un sommet dedans, ou une arête qui le traverse)
         var hit = S.zones.filter(function(z){
-          if (z.line) return C.clipLine(z.line, rc).length > 0;
-          return C.clipLine(z.polygon.concat([z.polygon[0]]), rc).length > 0;
+          if (z.line) return C.clipLine(z.line.map(scr), rc).length > 0;
+          return C.clipLine(z.polygon.concat([z.polygon[0]]).map(scr), rc).length > 0;
         }).map(function(z){ return z.id; });
         select(a.add ? S.sel.concat(hit.filter(function(id){ return !isSel(id); })) : hit);
         a = null;
@@ -632,7 +722,7 @@
     // v0.7.4 : le pont existant est retiré du relief envoyé (terrain continu sous l'ouvrage), sauf si la case est décochée
     var g = S.axis && S.strip ? C.removeBridge(d.grid, d.mnt, d.mns, S.axis, deckWidth()) : { mnt: d.mnt, mns: d.mns };
     return C.buildPacket({
-      frame: { lat: d.F.lat, lon: d.F.lon }, grid: d.grid, mnt: g.mnt, mns: g.mns, image: d.imageObj || null,
+      frame: { lat: d.F.lat, lon: d.F.lon }, rotation: d.F.rot || 0, grid: d.grid, mnt: g.mnt, mns: g.mns, image: d.imageObj || null,
       zones: S.zones.map(function(z){ return { type: z.type, source: z.source, polygon: z.polygon, line: z.line, width: z.width, level: z.level }; }),
       bridge: S.axis ? { axis: S.axis, structure: S.o ? { id: String(S.o.num), name: structName(S.o) } : null } : null,
       attribution: d.attribution
@@ -650,20 +740,22 @@
   }
   // Accusé de réception de BridgeSketch 3D (0.6.9+) : « reçu et validé », « appliqué », « fermé » ou « erreur ».
   // Seuls les messages de la fenêtre destinataire et portant l'identifiant du transfert sont pris en compte.
+  // v0.7.5 : `target` = fenêtre destinataire, ou null quand le bloc part par le canal vers un onglet déjà ouvert (l'accusé revient
+  // alors par le canal : S.ackCore).
   function listenAck(target, id, sent){
     if (S.ack) S.ack.stop();
     var timer, stp = function(n){ return '<span class="b3d-ack">' + ['Envoyé', 'Reçu et validé', 'Appliqué'].map(function(t, i){ return '<span class="' + (i < n ? 'on' : '') + '">' + (i < n ? '✓ ' : '○ ') + t + '</span>'; }).join(' → ') + '</span>'; };
-    var stop = function(){ clearTimeout(timer); window.removeEventListener('message', onAck); S.ack = null; };
+    var stop = function(){ clearTimeout(timer); window.removeEventListener('message', onAck); S.ack = null; S.ackCore = null; };
     var onAck = function(ev){
       var d = ev.data;
-      if (ev.source !== target || !d || d.type !== 'bs3d-terrain-ack' || d.id !== id) return;
+      if ((target && ev.source !== target) || !d || d.type !== 'bs3d-terrain-ack' || d.id !== id) return;
       if (d.state === 'received') { clearTimeout(timer); status('ok', stp(2) + '<br>BridgeSketch 3D a validé le paquet (' + plural(+d.zones || 0, 'zone', 'zones') + '). Placez le pont dans sa fenêtre.'); }
       else if (d.state === 'applied') { stop(); status('ok', stp(3) + '<br>Le site et le pont sont en place dans BridgeSketch 3D.'); }
       else if (d.state === 'closed') { stop(); status('busy', stp(2) + '<br>La fenêtre d’import de BridgeSketch 3D a été fermée sans appliquer le site. Renvoyez le bloc pour reprendre.'); }
       else if (d.state === 'error') { stop(); status('err', '✗ Refusé par BridgeSketch 3D : ' + esc(String(d.message || 'paquet invalide'))); }
     };
-    window.addEventListener('message', onAck);
-    timer = setTimeout(function(){ window.removeEventListener('message', onAck); S.ack = null; status('busy', stp(1) + '<br>' + sent + ' Pas d’accusé de réception en 15 s : vérifiez la fenêtre BridgeSketch 3D (onglet en arrière-plan ?).'); }, 15000);
+    if (target) window.addEventListener('message', onAck); else S.ackCore = function(d){ onAck({ data: d }); };
+    timer = setTimeout(function(){ window.removeEventListener('message', onAck); S.ack = null; S.ackCore = null; status('busy', stp(1) + '<br>' + sent + ' Pas d’accusé de réception en 15 s : vérifiez la fenêtre BridgeSketch 3D (onglet en arrière-plan ?).'); }, 15000);
     S.ack = { stop: stop };
     return stp(1);
   }
@@ -679,7 +771,51 @@
     status('ok', head + '<br>' + sent + ' En attente de BridgeSketch 3D…');
     return true;
   }
-  function send(){
+  // ---------- v0.7.5 : fenêtres BridgeSketch 3D déjà ouvertes ----------
+  // Deux moyens de les connaître : (1) la fenêtre que cet onglet a ouverte lors d'un envoi précédent (S.win) ; (2) un canal
+  // BroadcastChannel quand les deux applis sont servies par la même origine (acheruel.github.io) : chaque onglet BridgeSketch 3D
+  // répond à « qui est ouvert ? » par son nom de projet. Le bloc part alors par ce canal, sans rien ouvrir.
+  function sameOrigin(){ try { return new URL(bs3dUrl(), location.href).origin === location.origin; } catch (e) { return false; } }
+  function linkChannel(){
+    if (S.bc || !window.BroadcastChannel || !sameOrigin()) return;
+    try { S.bc = new BroadcastChannel('bs3d-terrain-link'); } catch (e) { return; }
+    S.bc.onmessage = function(ev){
+      var d = ev.data; if (!d || typeof d !== 'object') return;
+      if (d.type === 'bs3d-here' && d.ping === S.me && typeof d.tab === 'string') {
+        var isNew = !S.tabs[d.tab] || S.tabs[d.tab].name !== d.name;
+        S.tabs[d.tab] = { name: String(d.name || 'Pont').slice(0, 60), terrain: !!d.terrain, seen: Date.now() };
+        if (isNew && S.mode === 'edit' && !S.tool) render();
+      } else if (d.type === 'bs3d-terrain-ack' && d.to === S.me && S.ackCore) S.ackCore(d);
+    };
+    setInterval(function(){ if (S.mode === 'edit' && S.host && !S.host.hidden && !document.hidden) ping(); }, 4000);
+  }
+  function ping(){
+    if (!S.bc) return;
+    var now = Date.now(), gone = false;
+    Object.keys(S.tabs).forEach(function(k){ if (now - S.tabs[k].seen > 9500) { delete S.tabs[k]; gone = true; } });
+    if (gone && S.mode === 'edit' && !S.tool) render();
+    try { S.bc.postMessage({ type: 'bs3d-ping', ping: S.me }); } catch (e) { /* canal fermé */ }
+  }
+  function targets(){
+    var out = Object.keys(S.tabs).map(function(k){ return { kind: 'tab', tab: k, label: '« ' + S.tabs[k].name + ' »' + (S.tabs[k].terrain ? ' · un terrain y est déjà importé' : '') }; });
+    if (!out.length && S.win && !S.win.closed) out.push({ kind: 'win', label: 'celle ouverte par cet onglet' });
+    return out;
+  }
+  function sendTo(i){
+    var t = targets()[i]; if (!t || S.sending) return;
+    if (t.kind === 'win') { send(true); return; }
+    var p = packet(), errs = C.validatePacket(p);
+    if (errs.length) { status('err', 'Paquet non conforme : ' + esc(errs.join(', '))); return; }
+    var id = 'qa-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8), m = {}, k;
+    for (k in p) m[k] = p[k];
+    m.transferId = id; m.to = t.tab; m.from = S.me;
+    var sent = 'Terrain envoyé à la fenêtre ' + esc(t.label) + ' (' + plural(p.zones.length, 'zone', 'zones') + (p.bridge ? ', axe du pont' : ', sans axe') + ').';
+    var head = listenAck(null, id, sent);
+    try { S.bc.postMessage(m); } catch (e) { status('err', 'Envoi impossible vers la fenêtre ouverte (' + esc(e.message || 'canal') + '). Ouvrez une nouvelle fenêtre, ou téléchargez le fichier.'); return; }
+    status('ok', head + '<br>' + sent + ' Passez à l’onglet BridgeSketch 3D : la fenêtre d’import s’y ouvre.');
+  }
+  // reuse = true : la fenêtre ouverte par cet onglet est réutilisée (même nom de fenêtre : elle revient au premier plan sans se recharger)
+  function send(reuse){
     if (S.sending) return;
     // chemin 1 : BridgeSketch 3D nous a ouverts (?bs3d=1) -> window.opener.postMessage(paquet, '*')
     if (S.bs3d && window.opener && !window.opener.closed) { post(window.opener, '*'); return; }
@@ -687,8 +823,11 @@
     // window.open reste dans le geste de l'utilisateur : il vient avant tout calcul.
     var url = bs3dUrl(), origin = '*';
     try { origin = new URL(url, location.href).origin; } catch (e) { /* adresse invalide : '*' */ }
-    var w = window.open(url + '#terrain-import');
+    if (!(reuse && S.win && !S.win.closed)) S.winName = 'bs3d-' + Date.now().toString(36);
+    var w = window.open(url + '#terrain-import', S.winName);
     if (!w) { status('err', 'Le navigateur a bloqué l’ouverture de BridgeSketch 3D. Autorisez les fenêtres surgissantes pour ce site, ou téléchargez le fichier.'); return; }
+    S.win = w;
+    try { w.focus(); } catch (e) { /* fenêtre d'une autre origine : le navigateur décide */ }
     var done = false, timer;
     var stop = function(){ done = true; clearTimeout(timer); window.removeEventListener('message', onMsg); S.sending = null; };
     var onMsg = function(ev){
@@ -720,11 +859,12 @@
     else if (act === 'draw') { if (S.drawing) endDrawRect(true); else startDrawRect(); }
     else if (act === 'sq') {
       S.side0 = parseInt(b.getAttribute('data-s'), 10);
-      var c = S.o && S.o.lat != null ? { lat: S.o.lat, lng: S.o.lon } : S.rect ? { lat: (S.rect.s + S.rect.n) / 2, lng: (S.rect.w + S.rect.e) / 2 } : S.map.getCenter();
+      var c = S.o && S.o.lat != null ? { lat: S.o.lat, lng: S.o.lon } : S.rect ? { lat: S.rect.lat, lng: S.rect.lon } : S.map.getCenter();
       showRect(squareAround(c.lat, c.lng, S.side0), true);
-      S.map.fitBounds([[S.rect.s, S.rect.w], [S.rect.n, S.rect.e]], { padding: [60, 60] });
+      S.map.fitBounds(rectBounds(S.rect), { padding: [60, 60] });
       render();
     }
+    else if (act === 'rot0') { setRot(0); render(); }
     else if (act === 'extract') { if (S.rect) { endDrawRect(false); extract(); } }
     else if (act === 'cancel') { S.run++; S.mode = 'select'; render(); handles(S.rect); drawDots(); }
     else if (act === 'fam') { var ids = S.zones.filter(function(z){ return z.type === t; }).map(function(z){ return z.id; }); select(b.getAttribute('aria-pressed') === 'true' ? [] : ids); }
@@ -739,13 +879,15 @@
     else if (act === 'canceltool') cancelTool();
     else if (act === 'axis') startTool('axis', null);
     else if (act === 'axisdel') { pushUndo(); S.axis = null; S.axisSrc = null; drawAxis(); render(); }
-    else if (act === 'send') send();
+    else if (act === 'send' || act === 'sendnew') send(false);
+    else if (act === 'sendto') sendTo(parseInt(b.getAttribute('data-i'), 10));
     else if (act === 'download') download();
     else if (act === 'again') newBlock();
   }
   function onChange(e){
     var t = e.target, act = t.getAttribute && t.getAttribute('data-act'), zs = selZones();
     if (act === 'strip') { S.strip = t.checked; return; }
+    if (act === 'rot') { var deg = parseFloat(String(t.value).replace(',', '.')); if (isFinite(deg) && S.mode === 'select') { setRot(deg); render(); } return; }
     if (!act || !zs.length) return;
     if (act === 'type' && t.value) { pushUndo(); zs.forEach(function(z){ if (z.polygon) { z.type = t.value; z.source = 'user'; if (z.type !== 'water' && z.type !== 'river') delete z.level; refreshZone(z); } }); render(); }
     else if (act === 'width') { var w = parseFloat(String(t.value).replace(',', '.')); if (!isFinite(w)) return; pushUndo(); zs.forEach(function(z){ if (z.line) { z.width = Math.max(3, Math.min(25, w)); z.source = 'user'; } }); render(); }
@@ -785,5 +927,7 @@
   window.QA_MOD.bloc3d = { show: show,
     // essais (console, script de contrôle) : état, paquet et fichier courants, rectangle et extraction programmatiques
     _t: { state: function(){ return S; }, packet: function(){ return packet(); }, json: function(){ return C.packetToJson(packet()); },
-      setRect: function(s, w, n, e){ showRect({ s: s, w: w, n: n, e: e }, true); render(); }, extract: extract, send: send, download: download, select: select, del: deleteZones, undo: undo } };
+      setRect: function(s, w, n, e){ var b = C.blockFromBounds(s, w, n, e); showRect({ lat: b.F.lat, lon: b.F.lon, w: b.wM, h: b.hM, rot: 0 }, true); render(); },
+      setBlock: function(lat, lon, w, h, rot){ S.rot0 = rot || 0; showRect({ lat: lat, lon: lon, w: w, h: h, rot: rot || 0 }, true); render(); },
+      extract: extract, send: send, sendTo: sendTo, targets: targets, ping: ping, download: download, select: select, del: deleteZones, undo: undo } };
 })();
