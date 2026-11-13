@@ -30,7 +30,7 @@ bridges, culverts, retaining walls and tunnels. The interface is in French, like
   flood zones and invasive species within 1, 2 or 5 km. The seismic tool shows the National Building Code hazard.
   The **future climate** tool shows temperature and precipitation changes at the structure (ECCC CMIP6 scenarios,
   reference 1971-2000 or 2021-2050).
-- **Export to BridgeSketch 3D** (v0.7.2, redone in v0.7.4, in the **Exporter** menu since v0.7.5): the last entry of
+- **Export to BridgeSketch 3D** (v0.7.2, redone in v0.7.4, in the **Exporter** menu since v0.7.5; open Québec orthophotos since v0.7.6): the last entry of
   the "Exporter" menu. The view has its own satellite map. Pick a structure (number, or click it on the map) and a
   block of up to 1.5 km, straight or **turned** (round handle); in 5 to 10 seconds QuickerAtlas extracts the 1 m LiDAR
   terrain (ground and surface) and the satellite image (up to 4,096 px), and detects a few reliable zones: water and

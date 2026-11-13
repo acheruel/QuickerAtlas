@@ -35,7 +35,7 @@ plus rapide à explorer.
   humides, zones inondables et espèces envahissantes à 1, 2 ou 5 km), aléa sismique du code national du bâtiment.
   **Climat futur** : températures et précipitations passées et futures à l’ouvrage (scénarios CMIP6 d’ECCC, référence
   1971-2000 ou 2021-2050).
-- **Export vers BridgeSketch 3D** (v0.7.2, refait en v0.7.4, dans le menu **Exporter** depuis la v0.7.5) : dernier choix
+- **Export vers BridgeSketch 3D** (v0.7.2, refait en v0.7.4, dans le menu **Exporter** depuis la v0.7.5 ; orthophotos ouvertes du Québec depuis la v0.7.6) : dernier choix
   du menu « Exporter ». La vue a sa propre carte satellite. On choisit un ouvrage (n°, ou clic sur la carte) et un bloc
   de 1,5 km au plus, droit ou **incliné** (poignée ronde) ; en 5 à 10 secondes, QuickerAtlas extrait le relief LiDAR 1 m
   (sol et surface) et l’image satellite (jusqu’à 4 096 px), et repère peu de zones, mais justes : eau et forêt par le

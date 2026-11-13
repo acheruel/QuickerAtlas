@@ -3,6 +3,7 @@
 // simplification, découpe, OSM. Lancé par tests/test_js.py (node tests/js/bloc3d_calc.mjs).
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 var require = createRequire(import.meta.url);
 var B = require('../../js/bloc3d-calc.js');
 var n = 0;
@@ -329,6 +330,54 @@ ok('détection v0.7.5 : pelouse jaunie détectée, routes jamais dans les zones 
   assert.equal(R.zones.filter(function(z){ return z.type === 'road'; }).length, 0, 'aucune route dans les zones');
   assert.ok(R.roads.length >= 1 && R.roads[0].line.length >= 2, 'les lignes du masque reviennent à part');
   assert.equal(B.detect({ grid: g, img: { px: px, w: W, h: W }, mnt: mnt, mns: mns, roads: null }).roads.length, 0);
+});
+
+ok('orthophotos v0.7.6 : capacités du MERN lues, couches écartées (licence, doublons), classement du plus récent au plus fin', function(){
+  var xml = readFileSync(new URL('../fixtures/mern_wms_imagerie_extrait.xml', import.meta.url), 'utf8');
+  var layers = B.parseWmsLayers(xml);
+  assert.equal(layers.length, 42, 'les 42 couches de l\'extrait');
+  assert.deepEqual(layers[1].bbox.map(function(v){ return Math.round(v * 100) / 100; }), [-78.23, 47.69, -76.91, 48.31]);
+  var c = B.orthoCandidates(layers), names = c.map(function(x){ return x.layer; });
+  assert.ok(!names.some(function(n){ return /Telechargement_imagerie/.test(n); }), 'mosaïques de téléchargement : doublons');
+  assert.ok(!names.some(function(n){ return /CMQ/.test(n) || /2020_2020_Partenariat_Monteregie/.test(n); }), 'CMQ 2021 (CC BY-NC-SA) et GéoMont 2020 (CC BY-NC) écartés');
+  assert.ok(names.indexOf('Orthomosaique_2025_2025_Partenariat_SaguenayLacSaintJean_10cm_RVB') >= 0 && names.indexOf('GeoMont_Orthophotos_2023') >= 0);
+  var chic = [-71.07, 48.43, -71.06, 48.44], r = B.rankOrtho(c, chic);
+  assert.deepEqual(r.map(function(x){ return x.year + '/' + x.resCm; }), ['2025/10', '2025/15', '2025/20', '2024/20', '2023/20', '2021/20', '2020/20'], 'rectangles qui touchent Chicoutimi, du plus récent au plus ancien');
+  assert.equal(r[0].layer, 'Orthomosaique_2025_2025_Partenariat_SaguenayLacSaintJean_10cm_RVB', 'le plus récent et le plus fin d\'abord');
+  assert.equal(r.filter(function(x){ return /SaguenayLacSaintJean/.test(x.layer); }).length, 1, 'même partenaire, même année : seule la résolution la plus fine');
+  for (var i = 1; i < r.length; i++) assert.ok(r[i - 1].year >= r[i].year, 'années décroissantes');
+  assert.equal(r[0].partner, 'Saguenay Lac Saint Jean');
+  // 13741 (Montérégie) : GéoMont 2023 est le seul candidat ouvert dont le rectangle touche le bloc ; les couches 2020 de la Montérégie sont écartées
+  var mont = B.rankOrtho(c, [-72.947, 45.647, -72.940, 45.653]);
+  assert.ok(mont.some(function(x){ return x.src.id === 'geomont' && x.year === 2023; }) && !mont.some(function(x){ return /Monteregie/.test(x.raw); }));
+  assert.ok(B.rankOrtho(c, [-73.0, 49.9, -72.9, 50.0]).every(function(x){ return x.src.id !== 'geomont'; }), 'hors du rectangle de GéoMont');
+  assert.equal(B.orthoLabel(r[0]), 'Orthophoto 2025 · 10 cm');
+  assert.equal(B.orthoSub(r[0]), 'Saguenay Lac Saint Jean · Gouvernement du Québec · CC BY 4.0');
+  assert.ok(/GéoMont/.test(B.orthoCredit(c[c.length - 1])) && /CC BY 4\.0/.test(B.orthoCredit(r[0])));
+  assert.equal(B.parseWmsLayers('<Layer><Title>x</Title></Layer>').length, 0);
+});
+ok('orthophotos v0.7.6 : couverture (image vide = hors couverture), plan de téléchargement plafonné à 8 192 px, PNG ou JPEG', function(){
+  var n = 16 * 16, px = new Uint8ClampedArray(n * 4), i;
+  assert.equal(B.rgbaCoverage(px), 0, 'tout transparent');
+  for (i = 0; i < n; i++) { px[i * 4] = 40 + (i % 7) * 9; px[i * 4 + 1] = 90; px[i * 4 + 2] = 60 + (i % 5); px[i * 4 + 3] = 255; }
+  assert.equal(B.rgbaCoverage(px), 1, 'tout opaque');
+  for (i = 0; i < n / 2; i++) px[i * 4 + 3] = 0;
+  near(B.rgbaCoverage(px), 0.5, 1e-9);
+  for (i = 0; i < n; i++) { px[i * 4] = 255; px[i * 4 + 1] = 255; px[i * 4 + 2] = 255; px[i * 4 + 3] = 255; }
+  assert.equal(B.rgbaCoverage(px), 0, 'image blanche uniforme : pas de donnée');
+  // 600 × 600 m : 20 cm = 5 px/m = 3 000 px (une dalle de GéoMont) ; 10 cm = 10 px/m = 6 000 px en 3 × 3 dalles de 2 000 px
+  var a = B.orthoPlan(600, 600, 20, 8192, 3000), b = B.orthoPlan(600, 600, 10, 8192, 2000);
+  assert.deepEqual([a.nw, a.nh, a.nx, a.ny, a.capped], [3000, 3000, 1, 1, false]);
+  assert.deepEqual([b.nw, b.nh, b.nx, b.ny, b.capped], [6000, 6000, 3, 3, false]);
+  // 1 500 m à 10 cm = 15 000 px demandés : plafonné à 8 192 px (5,46 px/m)
+  var c = B.orthoPlan(1500, 900, 10, 8192, 2000);
+  assert.deepEqual([c.nw, c.nh, c.nx, c.ny, c.capped], [8192, 4915, 5, 3, true]);
+  assert.equal(B.orthoPlan(10, 10, 20).nw, 64, 'plancher de 64 px');
+  assert.ok(B.tryPng(3000, 3000) && !B.tryPng(6000, 6000), 'PNG tenté seulement jusqu\'à 12 M de pixels');
+  assert.ok(B.keepPng(24.9e6) && !B.keepPng(25.1e6), 'PNG gardé jusqu\'à 25 Mo');
+  assert.equal(B.ORTHO.JPEG_Q, 0.98);
+  var u = B.orthoUrl(B.rankOrtho(B.orthoCandidates([{ name: 'Orthomosaique_2025_2025_Partenariat_X_10cm_RVB', bbox: [-80, 40, -60, 60] }]), [-71, 48, -70, 49])[0], [-7900000, 6200000, -7899000.123, 6201000], 512, 512);
+  assert.ok(/format=image\/png&transparent=true$/.test(u) && /crs=EPSG:3857/.test(u) && /bbox=-7900000\.00,6200000\.00,-7899000\.12,6201000\.00/.test(u));
 });
 
 console.log(n + ' essais Bloc 3D : ok');

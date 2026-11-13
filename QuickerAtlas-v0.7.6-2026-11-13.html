@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QuickerAtlas v0.7.5 · Atlas d’ouvrages d’art au Québec</title>
+<title>QuickerAtlas v0.7.6 · Atlas d’ouvrages d’art au Québec</title>
 <!-- v0.6.7 : titre et description repris dans l'aperçu des liens partagés (Teams, courriel, réseaux : balises Open Graph) -->
 <meta name="description" content="Visualisation moderne de l’inventaire des structures du MTMD au Québec, avec ma touche personnelle : profil LiDAR, données des cours d’eau, sismiques, etc. ! À partir de données publiques.">
 <meta property="og:type" content="website">
@@ -380,6 +380,14 @@ body.view-x3d .workspace.workspace{grid-template-columns:minmax(0,1fr)!important
 .x3d-thumbwrap{display:flex;gap:10px;align-items:center}
 .x3d-thumbwrap canvas{flex:none;width:84px;max-height:84px;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#ebeff2}
 .x3d-ts{font-size:.74rem;font-variant-numeric:tabular-nums}
+/* v0.7.6 : choix de l'image du site (orthophotos ouvertes du Québec ou Esri) */
+.x3d-imgs{display:flex;flex-direction:column;gap:6px}
+.x3d-opt{display:grid;grid-template-columns:auto 84px minmax(0,1fr);gap:8px;align-items:center;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;cursor:pointer;background:#fff}
+.x3d-opt.on{border-color:var(--teal);background:var(--mint)}
+.x3d-opt img,.x3d-ph{width:84px;height:64px;object-fit:contain;background:#ebeff2;border-radius:4px;display:block}
+.x3d-opt b{font-size:.8rem}.x3d-opt small{display:block;color:var(--muted);font-size:.72rem;line-height:1.35}
+.x3d-opt em{font-style:normal;font-size:.64rem;font-weight:700;color:#00534f;background:#d9f5eb;border-radius:8px;padding:1px 6px;margin-left:4px;white-space:nowrap}
+.x3d-optst.ok{color:#00534f}.x3d-optst.err{color:var(--amber)}
 .x3d-warns{margin:0;padding:6px 8px 6px 22px;border-radius:6px;background:#fff6dc;font-size:.74rem}
 .x3d-sec{display:flex;flex-direction:column;gap:7px;padding-top:10px;border-top:1px solid var(--line)}
 .x3d-fam{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
@@ -1101,7 +1109,7 @@ table.list tbody tr:hover{background:#eef5f7}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="data/structures.js"></script>
 <script src="data/details.js"></script>
-<script>window.PQ_META={"version": "0.7.5", "date": "2026-11-10", "author": "Anthony Chéruel"};</script>
+<script>window.PQ_META={"version": "0.7.6", "date": "2026-11-13", "author": "Anthony Chéruel"};</script>
 <script>
 (function(){
   'use strict';

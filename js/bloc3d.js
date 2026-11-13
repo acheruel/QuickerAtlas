@@ -7,6 +7,9 @@
    v0.7.5 : ouvert par le menu « Exporter » ; bloc en rectangle incliné (poignée de rotation) ; image satellite jusqu'à 4 096 px ;
    plus de routes détectées (l'utilisateur les trace ; CanVec n'oriente plus que l'axe du pont) ; herbe mieux détectée ; envoi vers
    une fenêtre BridgeSketch 3D déjà ouverte ou vers une nouvelle, au choix.
+   v0.7.6 : image du site au choix : jusqu'à 3 orthophotos ouvertes du Québec (MERN, GéoMont ; CC BY 4.0), les plus récentes qui
+   couvrent le bloc, à la finesse native (plafond 8 192 px), en PNG sans perte tant que l'image reste sous 25 Mo, sinon JPEG 0,98 ;
+   Esri reste le repli et l'image de la détection des zones (calibrée sur Esri). Choix dans le volet, avec aperçus.
    Module chargé à la demande (js/lidar.js et js/bloc3d-calc.js d'abord). Contrat : window.QA_MOD.bloc3d.show(host, o, opt).
    Les calculs purs sont dans js/bloc3d-calc.js (testés par tests/js/bloc3d_calc.mjs). ES5. */
 (function(){
@@ -25,7 +28,7 @@
   var ORDER = ['river', 'water', 'forest', 'grass', 'road'];
   var S = { host: null, map: null, side: null, bar: null, o: null, bs3d: false, mode: 'select', rect: null, blk: null, grid: null, rectL: null, handles: [], drawing: false, run: 0,
     data: null, zones: [], axis: null, axisSrc: null, sel: [], zl: {}, vh: [], tool: null, svg: null, nextId: 1, steps: [], status: null, sending: null, undo: [], box: false, dots: null, side0: 600, strip: true,
-    rot0: 0, win: null, tabs: {}, bc: null, me: 'qa-' + Math.random().toString(36).slice(2, 10), ackCore: null };
+    rot0: 0, win: null, tabs: {}, bc: null, ortho: null, orthoCands: null, me: 'qa-' + Math.random().toString(36).slice(2, 10), ackCore: null };
   var $ = function(s){ return S.host.querySelector(s); };
 
   // ---------- Outils ----------
@@ -83,6 +86,7 @@
     // v0.7.5 : la carte suit toujours la taille de son cadre (mise en page tardive, fenêtre redimensionnée, volet replié)
     if (window.ResizeObserver) new ResizeObserver(function(){ if (S.map && !S.host.hidden) S.map.invalidateSize({ animate: false }); }).observe($('#x3d-map'));
     linkChannel();
+    orthoCands();                                  // v0.7.6 : capacités du MERN lues dès l'ouverture de l'export (mises en cache)
   }
   // Structures du MTMD visibles (zoom ≥ 12) : un clic choisit l'ouvrage et place un bloc autour de lui
   function drawDots(){
@@ -201,6 +205,7 @@
       (isFinite(d.zmin) ? 'Altitude ' + QA.nf1.format(d.zmin) + ' à ' + QA.nf1.format(d.zmax) + ' m' : '') + '<br>' +
       'MNT ' + fmt(d.fin * 100) + ' % · ' + (d.mns ? 'MNS' : 'sans MNS') + ' · ' + (d.jpeg ? 'image' : 'sans image') + ' · ' + QA.nf1.format(d.seconds) + ' s</div></div>';
     if (d.warns.length) h += '<ul class="x3d-warns">' + d.warns.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>';
+    h += imageHtml();
     h += '<div class="x3d-sec"><div class="x3d-h">Zones du site (' + S.zones.length + ')</div><ul class="x3d-fam">' + ORDER.map(function(k){
       var zs = S.zones.filter(function(z){ return z.type === k; }), n = zs.length, on = n && zs.every(function(z){ return isSel(z.id); });
       return '<li class="' + (n ? '' : 'none') + '">' + swatch(k) + '<button type="button" class="x3d-famname" data-act="fam" data-t="' + k + '"' + (n ? '' : ' disabled') + ' aria-pressed="' + !!on + '" title="Sélectionner toutes les zones de ce type">' + TYPES[k].many + '</button><b>' + n + '</b>' +
@@ -215,7 +220,7 @@
   }
   // v0.7.5 : si une fenêtre BridgeSketch 3D est déjà ouverte, on propose d'y envoyer le bloc, ou d'en ouvrir une nouvelle
   function footHtml(){
-    var dis = S.sending ? ' disabled' : '', t = targets(), h = '<div class="x3d-foot">';
+    var dis = S.sending || imgBusy() ? ' disabled' : '', t = targets(), h = '<div class="x3d-foot">' + (imgBusy() ? '<small class="x3d-note">Image en cours de téléchargement : l’envoi sera possible dans un instant.</small>' : '');
     if (S.bs3d && window.opener && !window.opener.closed) h += '<button type="button" class="x3d-pri x3d-big" data-act="send"' + dis + '>Envoyer vers BridgeSketch 3D</button>';
     else if (t.length) {
       h += '<div class="x3d-h">BridgeSketch 3D est déjà ouvert</div>';
@@ -224,7 +229,7 @@
       });
       h += '<button type="button" data-act="sendnew"' + dis + '>Ouvrir une nouvelle fenêtre BridgeSketch 3D</button>';
     } else h += '<button type="button" class="x3d-pri x3d-big" data-act="sendnew"' + dis + '>Envoyer vers BridgeSketch 3D</button>';
-    return h + '<div class="x3d-row"><button type="button" data-act="download">Télécharger le fichier</button><button type="button" data-act="again">Nouveau bloc</button></div></div>';
+    return h + '<div class="x3d-row"><button type="button" data-act="download"' + (imgBusy() ? ' disabled' : '') + '>Télécharger le fichier</button><button type="button" data-act="again">Nouveau bloc</button></div></div>';
   }
   function status(kind, html){ S.status = html ? { kind: kind, html: html } : null; render(); }
   function drawThumb(){
@@ -399,6 +404,167 @@
       return { px: g.getImageData(0, 0, nw, nh).data, w: nw, h: nh, dataUrl: cv.toDataURL('image/jpeg', 0.9) };
     });
   }
+  // ---------- v0.7.6 : orthophotos ouvertes du Québec ----------
+  // Capacités (GetCapabilities du MERN, ≈ 170 Ko) lues une fois et gardées en mémoire ; GéoMont a une emprise fixe. En cas d'échec
+  // du MERN, il reste GéoMont (rien n'est mis en cache : le prochain bloc réessaie).
+  function orthoCands(){
+    if (S.orthoCands) return Promise.resolve(S.orthoCands);
+    S.capsFailed = false;
+    return fetchT(C.ORTHO_MERN.caps, null, 15000, 'text').then(function(t){
+      var l = C.parseWmsLayers(t);
+      if (!l.length) throw new Error('capacités vides');
+      return (S.orthoCands = C.orthoCandidates(l));
+    }).catch(function(e){ if (window.console) console.warn('Capacités du MERN indisponibles :', errText(e)); S.capsFailed = true; return C.orthoCandidates([]); });
+  }
+  function bitmapOf(url, ms){
+    return fetchT(url, null, ms, 'blob').then(function(b){ return createImageBitmap(b); });
+  }
+  // Redresse une image « nord en haut » (couvrant l'emprise du bloc incliné, demi-largeur halfE m) dans le repère du bloc ; sans rotation,
+  // l'image est déjà celle du bloc. Même géométrie que turnImage (qui, lui, relit les pixels pour la détection).
+  function blockCanvas(src, sw, sh, blk, halfE){
+    if (!blk.rot) return src;
+    var ps = sw / (2 * halfE), cv = document.createElement('canvas'), g;
+    cv.width = Math.max(64, Math.round(blk.wM * ps)); cv.height = Math.max(64, Math.round(blk.hM * ps));
+    g = cv.getContext('2d');
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    g.translate(cv.width / 2, cv.height / 2); g.rotate(-blk.rot * Math.PI / 180);
+    g.drawImage(src, -sw / 2, -sh / 2, sw, sh);
+    return cv;
+  }
+  function canvasBlob(cv, type, q){
+    return new Promise(function(res, rej){ cv.toBlob(function(b){ b ? res(b) : rej(new Error('encodage ' + type + ' impossible')); }, type, q); });
+  }
+  function blobDataUrl(b){
+    return new Promise(function(res, rej){ var r = new FileReader(); r.onload = function(){ res(r.result); }; r.onerror = function(){ rej(new Error('lecture du fichier')); }; r.readAsDataURL(b); });
+  }
+  // Aperçu en pastille de l'image de détection (Esri)
+  function imgThumb(im){
+    try {
+      var c0 = document.createElement('canvas'); c0.width = im.w; c0.height = im.h;
+      c0.getContext('2d').putImageData(new ImageData(im.px, im.w, im.h), 0, 0);
+      var k = 160 / Math.max(im.w, im.h), c1 = document.createElement('canvas'); c1.width = Math.max(8, Math.round(im.w * k)); c1.height = Math.max(8, Math.round(im.h * k));
+      c1.getContext('2d').drawImage(c0, 0, 0, c1.width, c1.height);
+      return c1.toDataURL('image/jpeg', 0.8);
+    } catch (e) { return null; }
+  }
+  // Une orthophoto candidate couvre-t-elle vraiment le bloc ? Image de 320 px sur l'emprise : un serveur renvoie du transparent hors
+  // couverture (le rectangle des capacités ne dit pas où il y a de l'image). Renvoie { c, prev (JPEG data URL, repère du bloc), cover } ou null.
+  function probeOrtho(c, blk, bi, bbImg){
+    var Wa = 2 * bi.halfE, Ha = 2 * bi.halfN, ps = 320 / Math.max(Wa, Ha), pw = Math.max(16, Math.round(Wa * ps)), ph = Math.max(16, Math.round(Ha * ps));
+    return bitmapOf(C.orthoUrl(c, bbImg, pw, ph), 25000).then(function(bm){
+      var cv = document.createElement('canvas'); cv.width = pw; cv.height = ph; cv.getContext('2d').drawImage(bm, 0, 0);
+      var out = blockCanvas(cv, pw, ph, blk, bi.halfE), cover = C.rgbaCoverage(out.getContext('2d').getImageData(0, 0, out.width, out.height).data);
+      if (cover < C.ORTHO.MIN_COVER) return null;
+      return { c: c, cover: cover, prev: out.toDataURL('image/jpeg', 0.8) };
+    });
+  }
+  // Jusqu'à 3 orthophotos ouvertes, les plus récentes qui couvrent le bloc : on sonde les candidates par groupes de 3 (au plus 8 requêtes)
+  function findOrtho(blk, bi, bbImg){
+    var ll = C.llBox(C.blockCorners(blk));
+    return orthoCands().then(function(cands){
+      var ranked = C.rankOrtho(cands, ll).slice(0, C.ORTHO.MAX_PROBES), found = [], fails = S.capsFailed ? 1 : 0, ok = 0, i = 0;
+      function next(){
+        if (found.length >= C.ORTHO.MAX_SHOWN || i >= ranked.length) return Promise.resolve();
+        var grp = ranked.slice(i, i + 3); i += 3;
+        return Promise.all(grp.map(function(c){
+          return probeOrtho(c, blk, bi, bbImg).then(function(r){ ok++; return r; }, function(e){ fails++; if (window.console) console.warn('Orthophoto ' + c.layer + ' :', errText(e)); return null; });
+        })).then(function(rs){ rs.forEach(function(r){ if (r && found.length < C.ORTHO.MAX_SHOWN) found.push(r); }); return next(); });
+      }
+      return next().then(function(){ return { list: found, fails: ok ? 0 : fails, tried: Math.min(i, ranked.length) }; });
+    });
+  }
+  function imgBusy(){ return !!(S.ortho && S.ortho.sel !== 'esri' && S.ortho.list[S.ortho.sel] && S.ortho.list[S.ortho.sel].state === 'busy'); }
+  // Image du paquet : l'orthophoto choisie (une fois téléchargée), sinon Esri
+  function currentImage(){
+    var o = S.ortho, d = S.data, it = o && o.sel !== 'esri' ? o.list[o.sel] : null;
+    if (it && it.res) return { dataUrl: it.res.dataUrl, attribution: C.orthoCredit(it.c), ortho: true, res: it.res };
+    return d && d.jpeg ? { dataUrl: d.jpeg, attribution: 'Esri World Imagery', ortho: false } : null;
+  }
+  function imgNote(o, i){
+    if (S.ortho !== o) return;
+    var el = S.side && S.side.querySelector('[data-img-state="' + i + '"]');
+    if (el) el.textContent = optState(o.list[i]);
+  }
+  function moText(n){ return QA.nf1.format(n / 1048576) + ' Mo'; }
+  function optState(it){
+    if (it.state === 'busy') return it.note;
+    if (it.state === 'ok') return 'Prête · ' + it.res.fmt + ' · ' + fmt(it.res.w) + ' × ' + fmt(it.res.h) + ' px · ' + moText(it.res.bytes) + ' · ' + QA.nf1.format(it.res.seconds) + ' s';
+    if (it.state === 'err') return 'Échec : ' + it.note + ' (choisir pour réessayer)';
+    var o = S.ortho, g = o && o.geo, p = g && C.orthoPlan(2 * g.bi.halfE, 2 * g.bi.halfN, it.c.resCm, C.ORTHO.MAX_PX, it.c.src.tile);
+    return p ? 'Se télécharge au choix, jusqu’à ' + fmt(p.nw) + ' × ' + fmt(p.nh) + ' px' : '';
+  }
+  // Téléchargement de l'orthophoto i à la finesse native (≤ 8 192 px), en dalles de ≤ 2 000 px (3 en parallèle), assemblée sur un canevas,
+  // redressée dans le repère du bloc, puis encodée : PNG sans perte si l'image est assez petite et le fichier ≤ 25 Mo, sinon JPEG 0,98.
+  function loadOrtho(i){
+    var o = S.ortho, it = o && o.list[i];
+    if (!it || it.state === 'busy' || it.state === 'ok') return;
+    var c = it.c, blk = o.geo.blk, bi = o.geo.bi, bb = o.geo.bbImg, Wa = 2 * bi.halfE, Ha = 2 * bi.halfN, plan = C.orthoPlan(Wa, Ha, c.resCm, C.ORTHO.MAX_PX, c.src.tile);
+    var t0 = performance.now(), cv, g, jobs = [], done = 0, total = plan.nx * plan.ny, x, y;
+    it.state = 'busy'; it.note = 'Téléchargement : 0 / ' + plural(total, 'dalle', 'dalles'); it.res = null;
+    if (S.mode === 'edit') render();
+    try { cv = document.createElement('canvas'); cv.width = plan.nw; cv.height = plan.nh; g = cv.getContext('2d'); if (!g) throw new Error('canevas trop grand'); }
+    catch (e) { loadFail(o, i, e); return; }
+    for (y = 0; y < plan.ny; y++) for (x = 0; x < plan.nx; x++) (function(x, y){
+      var px0 = Math.round(x * plan.nw / plan.nx), px1 = Math.round((x + 1) * plan.nw / plan.nx), py0 = Math.round(y * plan.nh / plan.ny), py1 = Math.round((y + 1) * plan.nh / plan.ny);
+      var tb = [bb[0] + (bb[2] - bb[0]) * px0 / plan.nw, bb[3] - (bb[3] - bb[1]) * py1 / plan.nh, bb[0] + (bb[2] - bb[0]) * px1 / plan.nw, bb[3] - (bb[3] - bb[1]) * py0 / plan.nh];
+      jobs.push(function(){
+        var url = C.orthoUrl(c, tb, px1 - px0, py1 - py0);
+        return bitmapOf(url, 90000).catch(function(){ return wait(1500).then(function(){ return bitmapOf(url, 90000); }); }).then(function(bm){
+          g.drawImage(bm, px0, py0, px1 - px0, py1 - py0); if (bm.close) bm.close();
+          it.note = 'Téléchargement : ' + (++done) + ' / ' + plural(total, 'dalle', 'dalles'); imgNote(o, i);
+        });
+      });
+    })(x, y);
+    var q = jobs.slice(), worker = function(){ var j = q.shift(); return j ? j().then(worker) : Promise.resolve(); };
+    Promise.all([worker(), worker(), worker()]).then(function(){
+      if (S.ortho !== o) return;
+      var out = blockCanvas(cv, plan.nw, plan.nh, blk, bi.halfE);
+      if (out !== cv) { cv.width = cv.height = 0; }
+      var png = C.tryPng(out.width, out.height) ? canvasBlob(out, 'image/png') : Promise.resolve(null);
+      return png.then(function(b){
+        if (b && C.keepPng(b.size)) return { blob: b, fmt: 'PNG sans perte', pngBytes: b.size };
+        return canvasBlob(out, 'image/jpeg', C.ORTHO.JPEG_Q).then(function(j){ return { blob: j, fmt: 'JPEG 0,98', pngBytes: b ? b.size : null }; });
+      }).then(function(r){
+        return blobDataUrl(r.blob).then(function(url){
+          if (S.ortho !== o) return;
+          it.res = { dataUrl: url, fmt: r.fmt, bytes: r.blob.size, pngBytes: r.pngBytes, w: out.width, h: out.height, tiles: total, seconds: (performance.now() - t0) / 1000 };
+          it.state = 'ok'; out.width = out.height = 0;
+          if (S.mode === 'edit') render();
+        });
+      });
+    }).catch(function(e){ loadFail(o, i, e); });
+  }
+  function loadFail(o, i, e){
+    if (S.ortho !== o) return;
+    var it = o.list[i]; it.state = 'err'; it.note = errText(e); it.res = null;
+    if (window.console) console.warn('Orthophoto ' + it.c.layer + ' :', e);
+    if (o.sel === i && S.data && S.data.jpeg) { o.sel = 'esri'; S.status = { kind: 'busy', html: 'Orthophoto ' + it.c.year + ' indisponible (' + esc(it.note) + ') : l’image Esri est gardée.' }; }
+    if (S.mode === 'edit') render();
+  }
+  function chooseImage(v){
+    var o = S.ortho; if (!o) return;
+    o.sel = v === 'esri' ? 'esri' : parseInt(v, 10);
+    S.status = null;
+    if (o.sel !== 'esri') { if (o.list[o.sel].state === 'err') o.list[o.sel].state = 'idle'; loadOrtho(o.sel); }
+    render();
+  }
+  function imageHtml(){
+    var o = S.ortho, d = S.data, h = '<div class="x3d-sec"><div class="x3d-h">Image du site (texture du terrain)</div>';
+    if (!o || (!o.list.length && !d.jpeg)) return h + '<p class="x3d-note">Aucune image disponible : le terrain partira sans texture.</p></div>';
+    h += '<div class="x3d-imgs" role="radiogroup" aria-label="Image envoyée à BridgeSketch 3D">';
+    o.list.forEach(function(it, i){
+      h += '<label class="x3d-opt' + (o.sel === i ? ' on' : '') + '"><input type="radio" name="x3d-img" value="' + i + '" data-act="img"' + (o.sel === i ? ' checked' : '') + '>' +
+        (it.prev ? '<img src="' + it.prev + '" alt="Aperçu de l’orthophoto ' + it.c.year + '">' : '<i class="x3d-ph"></i>') +
+        '<span><b>' + esc(C.orthoLabel(it.c)) + (i === 0 ? ' <em>la plus récente</em>' : '') + '</b><small>' + esc(C.orthoSub(it.c)) + '</small><small class="x3d-optst ' + it.state + '" data-img-state="' + i + '">' + esc(optState(it)) + '</small></span></label>';
+    });
+    if (d.jpeg) h += '<label class="x3d-opt' + (o.sel === 'esri' ? ' on' : '') + '"><input type="radio" name="x3d-img" value="esri" data-act="img"' + (o.sel === 'esri' ? ' checked' : '') + '>' +
+      (d.thumb ? '<img src="' + d.thumb + '" alt="Aperçu de l’image satellite Esri">' : '<i class="x3d-ph"></i>') +
+      '<span><b>Satellite Esri</b><small>Esri World Imagery · repli, 4 px/m au plus, JPEG</small></span></label>';
+    h += '</div>';
+    if (!o.list.length) h += '<p class="x3d-note">' + esc(o.msg || 'Aucune orthophoto ouverte ne couvre ce bloc : image Esri.') + '</p>';
+    else h += '<p class="x3d-note">Orthophotos ouvertes du Québec (CC BY 4.0), prises sans perte au serveur ; PNG sans perte dans le paquet tant que l’image reste sous 25 Mo, sinon JPEG 0,98. L’envoi attend la fin du téléchargement.</p>';
+    return h + '</div>';
+  }
   function extract(){
     var run = ++S.run, blk = S.blk, F_ = blk.F, grid = S.grid, k = F_.k, warns = [];
     // emprises Mercator : celle du bloc (image, masque des routes) et la même élargie de 4 m (LiDAR) ; un bloc incliné demande
@@ -409,7 +575,8 @@
     S.steps = [
       { id: 'dtm', label: 'Sol : MNT LiDAR 1 m (RNCan)', state: 'run' },
       { id: 'dsm', label: 'Surface : MNS LiDAR (arbres, tabliers)', state: 'wait' },
-      { id: 'img', label: 'Image satellite (Esri)', state: 'run' },
+      { id: 'img', label: 'Image satellite Esri (détection des zones, repli)', state: 'run' },
+      { id: 'ortho', label: 'Orthophotos ouvertes du Québec (MERN, GéoMont)', state: 'run' },
       { id: 'road', label: 'Direction de la route, pour l’axe du pont (CanVec)', state: 'run' },
       { id: 'calc', label: 'Détection des zones', state: 'wait' }
     ];
@@ -425,12 +592,17 @@
     var tImg = imageTiles(bbImg, nw, nh, 45000).then(function(im){
       if (blk.rot) { var t = turnImage(im, blk, bi.halfE, bi.halfN); im = { px: t.px, w: t.w, h: t.h, dataUrl: t.dataUrl }; }
       step('img', 'ok', im.w + ' × ' + im.h + ' pixels'); return im;
-    }, function(e){ step('img', 'warn', 'indisponible (' + errText(e) + ')'); warns.push('Image satellite indisponible : pas d’herbe détectée, ni d’image dans le paquet.'); return null; });
+    }, function(e){ step('img', 'warn', 'indisponible (' + errText(e) + ')'); warns.push('Image satellite Esri indisponible : pas d’herbe détectée, ni d’image de repli.'); return null; });
+    var tOrtho = findOrtho(blk, bi, bbImg).then(function(o){
+      step('ortho', o.list.length ? 'ok' : o.fails ? 'warn' : 'ok', o.list.length ? plural(o.list.length, 'orthophoto trouvée', 'orthophotos trouvées') + ' (' + o.list.map(function(x){ return x.c.year + ', ' + x.c.resCm + ' cm'; }).join(' ; ') + ')' :
+        o.fails ? 'serveur indisponible : image Esri' : 'aucune ne couvre ce bloc : image Esri');
+      return o;
+    }, function(e){ step('ortho', 'warn', 'indisponible (' + errText(e) + ') : image Esri'); return { list: [], fails: 1 }; });
     var tRoad = roadMask(bbImg, Math.min(1500, Math.round(Wa)), Math.min(1500, Math.round(Ha)), 15000).then(function(m){ step('road', 'ok'); m.halfE = bi.halfE; m.halfN = bi.halfN; return m; },
       function(e){ step('road', 'warn', 'indisponible (' + errText(e) + ')'); warns.push('Routes CanVec indisponibles : l’axe du pont est proposé est-ouest, à ajuster.'); return null; });
-    Promise.all([tDem, tMns, tImg, tRoad]).then(function(r){
+    Promise.all([tDem, tMns, tImg, tRoad, tOrtho]).then(function(r){
       if (run !== S.run) return;
-      step('calc', 'run'); return wait(30).then(function(){ return finish(run, r[0], r[1], r[2], r[3], warns, t0); });
+      step('calc', 'run'); return wait(30).then(function(){ return finish(run, r[0], r[1], r[2], r[3], r[4], warns, t0, { blk: blk, bi: bi, bbImg: bbImg }); });
     }).catch(function(e){
       if (run !== S.run) return;
       if (window.console) console.error(e);
@@ -445,7 +617,7 @@
       return r.line.map(function(p){ return C.rotIn(F_, p[0], p[1]); });
     });
   }
-  function finish(run, dem, dsm, im, mask, warns, t0){
+  function finish(run, dem, dsm, im, mask, ortho, warns, t0, geo){
     if (run !== S.run) return;
     var F_ = S.blk.F, grid = S.grid, hw = grid.cols * grid.cell / 2, hh = grid.rows * grid.cell / 2;
     var mnt = C.resample(dem, F_, grid), mns = dsm ? C.resample(dsm, F_, grid) : null, fin = C.finiteFraction(mnt);
@@ -463,7 +635,10 @@
     var jpeg = im && im.dataUrl ? im.dataUrl : im && im.buf ? 'data:image/jpeg;base64,' + C.bytesToB64(new Uint8Array(im.buf)) : null;
     var attribution = ['MNEHR 1 m © RNCan (OGL-Canada)'];
     if (jpeg) attribution.push('Esri World Imagery');
-    S.data = { F: F_, grid: grid, mnt: mnt, mns: mns, jpeg: jpeg, fin: fin, zmin: zmin, zmax: zmax, hs: C.hillshade(mnt, grid.cols, grid.rows, grid.cell, 340),
+    // v0.7.6 : l'image de l'export est au choix ; l'aperçu d'Esri vient de l'image de détection
+    S.ortho = { list: (ortho && ortho.list || []).map(function(x){ return { c: x.c, prev: x.prev, state: 'idle', note: '', res: null }; }), sel: 'esri', geo: geo, msg: ortho && ortho.fails && !(ortho.list || []).length ? 'Serveur d’orthophotos indisponible : image Esri.' : '' };
+    if (S.ortho.list.length || !jpeg) S.ortho.sel = S.ortho.list.length ? 0 : 'esri';
+    S.data = { F: F_, grid: grid, mnt: mnt, mns: mns, jpeg: jpeg, thumb: im ? imgThumb(im) : null, fin: fin, zmin: zmin, zmax: zmax, hs: C.hillshade(mnt, grid.cols, grid.rows, grid.cell, 340),
       attribution: attribution, warns: warns, det: det.stats, seconds: (performance.now() - t0) / 1000 };
     S.zones = zones; S.sel = []; S.tool = null; S.undo = [];
     // axe proposé : la route la plus proche de la structure donne la direction ; le tablier visible dans le MNS donne les deux bouts
@@ -485,6 +660,7 @@
     drawZones(); drawAxis(); drawStructure();
     S.map.fitBounds(rectBounds(S.rect), { padding: [30, 30], animate: false });
     render(); ping();
+    if (S.ortho.list.length) loadOrtho(0);                       // la plus récente part tout de suite, pendant la correction des zones
   }
 
   // ---------- Zones sur la carte ----------
@@ -718,19 +894,22 @@
   // ---------- Paquet et envoi ----------
   function packet(){
     var d = S.data;
-    if (!d.imageObj && d.jpeg) d.imageObj = { dataUrl: d.jpeg, attribution: 'Esri World Imagery' };
+    var im = currentImage(), attr = ['MNEHR 1 m © RNCan (OGL-Canada)'];
+    if (im) attr.push(im.attribution);
+    if (im && im.ortho && d.jpeg) attr.push('Zones d’herbe détectées d’après Esri World Imagery');
     // v0.7.4 : le pont existant est retiré du relief envoyé (terrain continu sous l'ouvrage), sauf si la case est décochée
     var g = S.axis && S.strip ? C.removeBridge(d.grid, d.mnt, d.mns, S.axis, deckWidth()) : { mnt: d.mnt, mns: d.mns };
     return C.buildPacket({
-      frame: { lat: d.F.lat, lon: d.F.lon }, rotation: d.F.rot || 0, grid: d.grid, mnt: g.mnt, mns: g.mns, image: d.imageObj || null,
+      frame: { lat: d.F.lat, lon: d.F.lon }, rotation: d.F.rot || 0, grid: d.grid, mnt: g.mnt, mns: g.mns, image: im ? { dataUrl: im.dataUrl, attribution: im.attribution } : null,
       zones: S.zones.map(function(z){ return { type: z.type, source: z.source, polygon: z.polygon, line: z.line, width: z.width, level: z.level }; }),
       bridge: S.axis ? { axis: S.axis, structure: S.o ? { id: String(S.o.num), name: structName(S.o) } : null } : null,
-      attribution: d.attribution
+      attribution: attr
     });
   }
   function deckWidth(){ var w = S.o && parseFloat(S.o.larg); return isFinite(w) && w >= 2 ? Math.min(60, w) : 12; }
   function fileName(){ return 'bloc-' + (S.o ? String(S.o.num).replace(/[^\w-]/g, '') : 'carte') + '-' + new Date().toISOString().slice(0, 10) + '.bs3dterrain'; }
   function download(){
+    if (imgBusy()) return;
     var p = packet(), errs = C.validatePacket(p);
     if (errs.length) { status('err', 'Paquet non conforme : ' + esc(errs.join(', '))); return; }
     var blob = new Blob([C.packetToJson(p)], { type: 'application/json' }), a = document.createElement('a');
@@ -765,7 +944,7 @@
     var m = C.packetForPost(p), id = 'qa-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
     m.message.transferId = id;
     var mo = (p.mnt.length + (p.mns ? p.mns.length : 0)) * 4 / 1048576,
-      sent = 'Terrain envoyé (' + QA.nf1.format(mo) + ' Mo de grilles' + (p.image ? ' + image' : '') + ', ' + plural(p.zones.length, 'zone', 'zones') + (p.bridge ? ', axe du pont' : ', sans axe') + ').';
+      sent = 'Terrain envoyé (' + QA.nf1.format(mo) + ' Mo de grilles' + (p.image ? ' + image de ' + QA.nf1.format(p.image.dataUrl.length * 0.75 / 1048576) + ' Mo' : '') + ', ' + plural(p.zones.length, 'zone', 'zones') + (p.bridge ? ', axe du pont' : ', sans axe') + ').';
     var head = listenAck(target, id, sent);
     target.postMessage(m.message, origin, m.transfer);
     status('ok', head + '<br>' + sent + ' En attente de BridgeSketch 3D…');
@@ -802,7 +981,7 @@
     return out;
   }
   function sendTo(i){
-    var t = targets()[i]; if (!t || S.sending) return;
+    var t = targets()[i]; if (!t || S.sending || imgBusy()) return;
     if (t.kind === 'win') { send(true); return; }
     var p = packet(), errs = C.validatePacket(p);
     if (errs.length) { status('err', 'Paquet non conforme : ' + esc(errs.join(', '))); return; }
@@ -816,7 +995,7 @@
   }
   // reuse = true : la fenêtre ouverte par cet onglet est réutilisée (même nom de fenêtre : elle revient au premier plan sans se recharger)
   function send(reuse){
-    if (S.sending) return;
+    if (S.sending || imgBusy()) return;
     // chemin 1 : BridgeSketch 3D nous a ouverts (?bs3d=1) -> window.opener.postMessage(paquet, '*')
     if (S.bs3d && window.opener && !window.opener.closed) { post(window.opener, '*'); return; }
     // chemin 2 : QuickerAtlas seul -> ouverture de BridgeSketch 3D (#terrain-import), attente de { type: 'bs3d-ready' }, puis envoi.
@@ -887,6 +1066,7 @@
   function onChange(e){
     var t = e.target, act = t.getAttribute && t.getAttribute('data-act'), zs = selZones();
     if (act === 'strip') { S.strip = t.checked; return; }
+    if (act === 'img') { chooseImage(t.value); return; }
     if (act === 'rot') { var deg = parseFloat(String(t.value).replace(',', '.')); if (isFinite(deg) && S.mode === 'select') { setRot(deg); render(); } return; }
     if (!act || !zs.length) return;
     if (act === 'type' && t.value) { pushUndo(); zs.forEach(function(z){ if (z.polygon) { z.type = t.value; z.source = 'user'; if (z.type !== 'water' && z.type !== 'river') delete z.level; refreshZone(z); } }); render(); }
@@ -903,7 +1083,7 @@
     else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); select(S.zones.map(function(z){ return z.id; })); }
   }
   function newBlock(){
-    cancelTool(true); clearZoneLayers(); S.data = null; S.zones = []; S.axis = null; S.sel = []; S.undo = []; S.mode = 'select'; S.status = null; S.box = false;
+    cancelTool(true); clearZoneLayers(); S.data = null; S.ortho = null; S.zones = []; S.axis = null; S.sel = []; S.undo = []; S.mode = 'select'; S.status = null; S.box = false;
     render(); if (S.rect) { showRect(S.rect, true); S.rectL.openTooltip(); } drawDots();
   }
 
@@ -929,5 +1109,5 @@
     _t: { state: function(){ return S; }, packet: function(){ return packet(); }, json: function(){ return C.packetToJson(packet()); },
       setRect: function(s, w, n, e){ var b = C.blockFromBounds(s, w, n, e); showRect({ lat: b.F.lat, lon: b.F.lon, w: b.wM, h: b.hM, rot: 0 }, true); render(); },
       setBlock: function(lat, lon, w, h, rot){ S.rot0 = rot || 0; showRect({ lat: lat, lon: lon, w: w, h: h, rot: rot || 0 }, true); render(); },
-      extract: extract, send: send, sendTo: sendTo, targets: targets, ping: ping, download: download, select: select, del: deleteZones, undo: undo } };
+      extract: extract, ortho: function(){ return S.ortho; }, loadOrtho: loadOrtho, chooseImage: chooseImage, probe: function(c){ var g = S.ortho && S.ortho.geo; return probeOrtho(c, g.blk, g.bi, g.bbImg); }, send: send, sendTo: sendTo, targets: targets, ping: ping, download: download, select: select, del: deleteZones, undo: undo } };
 })();

@@ -27,7 +27,7 @@ et y implante le pont. Ce document est la source de vérité des deux côtés (c
   // Rangée par rangée, du nord au sud, chaque rangée d'ouest en est : z[r * cols + c] en (x0 + c*cell, y0 - r*cell)
   mnt: Float32Array | 'base64…',           // sol nu (obligatoire)
   mns: Float32Array | 'base64…' | null,    // surface (facultatif)
-  image: { dataUrl: 'data:image/jpeg;base64,…', attribution: 'Esri World Imagery' } | null, // même emprise que la grille
+  image: { dataUrl: 'data:image/png|jpeg;base64,…', attribution: 'Esri World Imagery' } | null, // même emprise que la grille (0.7.6 : PNG ou JPEG, jusqu'à 8 192 px)
   zones: [                                 // modifiables dans QA avant l'envoi et dans BS3D après (0.6.9)
     { type: 'river' | 'water' | 'forest' | 'grass', source: 'osm' | 'auto' | 'user', polygon: [[x, y], …],
       level: 52.3 },                       // facultatif, eau seulement : cote absolue lue dans le MNT par QA ou saisie (sinon estimée par BS3D)
@@ -70,6 +70,21 @@ Ajouts compatibles de 2026-11-10 (QA v0.7.5, BS3D 0.7.1), toujours `version: 1` 
   `{ type: 'bs3d-here', tab, ping, name, terrain }`. Le paquet part sur le même canal avec `to: tab`, `from: idQA` et
   `transferId` ; l'accusé de réception revient avec `to: idQA`. Sinon QA réutilise la fenêtre qu'il a ouverte
   (`window.open` au même nom, `#terrain-import`) ou en ouvre une nouvelle, au choix de l'utilisateur.
+
+Ajouts compatibles de 2026-11-13 (QA v0.7.6), toujours `version: 1` :
+- **Image au choix** : l'utilisateur choisit dans QA l'image du bloc parmi jusqu'à 3 orthophotos ouvertes du Québec (les plus
+  récentes qui couvrent le bloc : service WMS Imagerie du MERN, GéoMont 2023 ; CC BY 4.0) et l'image satellite Esri (repli). L'image part
+  à la **finesse native** de l'orthophoto (20 cm = 5 px/m, 10 cm = 10 px/m), plafonnée à **8 192 px** sur le plus grand côté, dans le
+  repère du bloc (même emprise que la grille, bloc incliné redressé). `image.dataUrl` est un `data:image/png;base64,…` (sans perte) tant
+  que le PNG pèse 25 Mo au plus (essayé seulement jusqu'à 12 millions de pixels, soit ≈ 3 400 px de côté), sinon un `data:image/jpeg;base64,…`
+  de qualité 0,98. Esri reste en JPEG 0,90, 4 px/m au plus, 4 096 px. Tout `data:image/…` est valide : un lecteur doit lire PNG et JPEG.
+  Ordres de grandeur : bloc de 600 × 600 m à 20 cm = 3 000 px, PNG ≈ 12 Mo ; à 10 cm = 6 000 px, JPEG ≈ 14 Mo (le PNG ferait ≈ 78 Mo).
+- **Attribution** : `image.attribution` porte le crédit de l'image choisie (ex. « Imagerie orthorectifiée du Québec 2025 (Saguenay Lac Saint
+  Jean), 10 cm, © Gouvernement du Québec, CC BY 4.0 » ; « Orthophotos GéoMont 2023 (Montérégie), 20 cm, © GéoMont, CC BY 4.0 ») et
+  reprend dans `attribution[]`. Les zones d'herbe restent détectées sur l'image Esri (calibrée sur ses couleurs) : quand l'image envoyée est
+  une orthophoto, `attribution[]` ajoute « Zones d'herbe détectées d'après Esri World Imagery ».
+- Taille du fichier : un paquet avec orthophoto pèse typiquement 15 à 30 Mo en JSON (image en base64 comprise) ; BridgeSketch 3D doit
+  accepter des textures jusqu'à 8 192 px et des paquets de cet ordre (`postMessage` et fichier `.bs3dterrain`).
 
 ## Transport
 

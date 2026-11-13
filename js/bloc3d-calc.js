@@ -700,6 +700,96 @@
     return { axis: [[p[0] - ux * len / 2, p[1] - uy * len / 2], [p[0] + ux * len / 2, p[1] + uy * len / 2]], from: best ? 'route' : 'defaut', dir: [ux, uy], at: p };
   };
 
+  // ---------- v0.7.6 : orthophotos ouvertes du Québec ----------
+  // Sources (WMS, CORS ouvert, sans clé) : le service Imagerie du MERN (lu à l'ouverture : GetCapabilities ≈ 170 Ko) et GéoMont 2023
+  // (Montérégie, bbox fixe tirée de ses capacités). Licence : « Imagerie orthorectifiée du Québec » = CC BY 4.0 (Données Québec).
+  var MERN_WMS = 'https://servicesmatriciels.mern.gouv.qc.ca/erdas-iws/ogc/wms/Imagerie';
+  B.ORTHO = { MAX_PX: 8192, PNG_MAX_BYTES: 25e6, PNG_TRY_PX: 12e6, JPEG_Q: 0.98, MIN_COVER: 0.97, MAX_SHOWN: 3, MAX_PROBES: 8 };
+  B.ORTHO_MERN = { id: 'mern', url: MERN_WMS, caps: MERN_WMS + '?service=WMS&request=GetCapabilities&version=1.3.0', tile: 2000, license: 'CC BY 4.0', owner: 'Gouvernement du Québec' };
+  B.ORTHO_GEOMONT = { id: 'geomont', url: 'https://orthophotos2023.geomont.qc.ca/WMS/mapserv', layer: 'GeoMont_Orthophotos_2023', bbox: [-74.726657, 44.953616, -72.268169, 46.129778],
+    year: 2023, resCm: 20, partner: 'Montérégie', tile: 3000, license: 'CC BY 4.0', owner: 'GéoMont' };
+  // Couches écartées : licence non ouverte ou douteuse (GéoMont 2020 = CC BY-NC ; CMQ 2021 = CC BY-NC-SA) et mosaïques « Telechargement_imagerie »
+  // (doublons des couches de partenariat de la même année)
+  B.orthoExcluded = function(name){ return /Telechargement_imagerie|_CMQ_|^Orthomosaique_2020_\d{4}_Partenariat_Monteregie_/.test(name); };
+  var ACCENTS = { Quebec: 'Québec', Monteregie: 'Montérégie', Lanaudiere: 'Lanaudière', Riviere: 'Rivière', Cote: 'Côte', ValdOr: 'Val-d’Or', 'Val-Dor': 'Val-d’Or' };
+  function partnerName(s){
+    s = s.replace(/^Partenariat_/, '');
+    if (s === 'Inv_Ecofor') return 'Inventaire écoforestier';
+    if (/^Inv_Ecofor_/.test(s)) return 'Inventaire écoforestier ' + partnerName(s.slice(10));
+    if (s === 'RN_Fleuve-St-Laurent') return 'Fleuve Saint-Laurent';
+    if (ACCENTS[s]) return ACCENTS[s];
+    s = s.replace(/(Quebec|Monteregie|Lanaudiere|Riviere|Cote)/g, function(m){ return ACCENTS[m]; });
+    return s.replace(/([a-zé])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
+  }
+  // Couches nommées d'un GetCapabilities WMS 1.3.0 : [{ name, bbox: [ouest, sud, est, nord] }]. Lecture par expressions régulières
+  // (marche en Node comme dans le navigateur) : le nom d'une couche est suivi de sa EX_GeographicBoundingBox.
+  B.parseWmsLayers = function(xml){
+    var out = [], re = /<(?:\w+:)?Layer\b[^>]*>\s*<(?:\w+:)?Name>([^<]+)<\/(?:\w+:)?Name>[\s\S]*?<(?:\w+:)?westBoundLongitude>([^<]+)<[\s\S]*?<(?:\w+:)?eastBoundLongitude>([^<]+)<[\s\S]*?<(?:\w+:)?southBoundLatitude>([^<]+)<[\s\S]*?<(?:\w+:)?northBoundLatitude>([^<]+)</g, m;
+    while ((m = re.exec(String(xml || '')))) {
+      var b = [parseFloat(m[2]), parseFloat(m[4]), parseFloat(m[3]), parseFloat(m[5])];
+      if (b.every(isFinite)) out.push({ name: m[1].trim(), bbox: b });
+    }
+    return out;
+  };
+  // Orthophotos candidates : couches du MERN « Orthomosaique_AAAA_AAAA_<partenaire>_<n>cm_RVB » (hors couches écartées) + GéoMont 2023
+  B.orthoCandidates = function(layers){
+    var out = [];
+    (layers || []).forEach(function(l){
+      var m = /^Orthomosaique_(\d{4})_\d{4}_(.+)_(\d+)cm_RVB$/.exec(l.name);
+      if (!m || B.orthoExcluded(l.name)) return;
+      out.push({ src: B.ORTHO_MERN, layer: l.name, bbox: l.bbox, year: +m[1], resCm: +m[3], partner: partnerName(m[2]), raw: m[2] });
+    });
+    var g = B.ORTHO_GEOMONT;
+    out.push({ src: g, layer: g.layer, bbox: g.bbox, year: g.year, resCm: g.resCm, partner: g.partner, raw: 'GeoMont' });
+    return out;
+  };
+  B.llBox = function(pts){
+    var w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
+    pts.forEach(function(p){ s = Math.min(s, p[0]); n = Math.max(n, p[0]); w = Math.min(w, p[1]); e = Math.max(e, p[1]); });
+    return [w, s, e, n];
+  };
+  B.bboxIntersects = function(a, b){ return a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3]; };
+  // Candidates dont l'emprise (rectangle, pas la couverture réelle) touche le bloc, du plus récent au plus ancien, à année égale du plus
+  // fin au plus grossier ; pour un même partenaire et une même année, seule la résolution la plus fine est gardée.
+  B.rankOrtho = function(cands, blockLL){
+    var best = {};
+    cands.filter(function(c){ return B.bboxIntersects(c.bbox, blockLL); }).forEach(function(c){
+      var k = c.src.id + '|' + c.year + '|' + c.raw, p = best[k];
+      if (!p || c.resCm < p.resCm) best[k] = c;
+    });
+    return Object.keys(best).map(function(k){ return best[k]; }).sort(function(a, b){ return b.year - a.year || a.resCm - b.resCm || (a.layer < b.layer ? -1 : 1); });
+  };
+  // Part des pixels opaques d'une image RGBA (hors couverture : le serveur renvoie du transparent) ; une image uniforme compte pour 0
+  B.rgbaCoverage = function(px){
+    var n = px.length >> 2, opaque = 0, i, same = true;
+    if (!n) return 0;
+    for (i = 0; i < n; i++) {
+      if (px[i * 4 + 3] >= 250) opaque++;
+      if (same && i && (px[i * 4] !== px[0] || px[i * 4 + 1] !== px[1] || px[i * 4 + 2] !== px[2])) same = false;
+    }
+    return same ? 0 : opaque / n;
+  };
+  // Plan de téléchargement : px par mètre au sol = finesse native (100 / résolution en cm) plafonnée pour que le plus grand côté tienne
+  // dans maxPx ; image découpée en dalles d'au plus `tile` px (le serveur MERN refuse plus de 4 000 px).
+  B.orthoPlan = function(wM, hM, resCm, maxPx, tile){
+    maxPx = maxPx || B.ORTHO.MAX_PX; tile = tile || 2000;
+    var sc = Math.min(100 / resCm, maxPx / Math.max(wM, hM)), nw = Math.max(64, Math.round(wM * sc)), nh = Math.max(64, Math.round(hM * sc));
+    return { sc: sc, nw: nw, nh: nh, nx: Math.ceil(nw / tile), ny: Math.ceil(nh / tile), capped: sc < 100 / resCm - 1e-9 };
+  };
+  // Format de transport : PNG (sans perte) quand l'image est assez petite pour tenir sous PNG_MAX_BYTES, sinon JPEG qualité 0,98
+  B.tryPng = function(w, h){ return w * h <= B.ORTHO.PNG_TRY_PX; };
+  B.keepPng = function(bytes){ return bytes <= B.ORTHO.PNG_MAX_BYTES; };
+  B.orthoLabel = function(c){ return 'Orthophoto ' + c.year + ' · ' + c.resCm + ' cm'; };
+  B.orthoSub = function(c){ return c.partner + ' · ' + c.src.owner + ' · ' + c.src.license; };
+  B.orthoCredit = function(c){
+    return (c.src.id === 'geomont' ? 'Orthophotos GéoMont ' + c.year + ' (Montérégie)' : 'Imagerie orthorectifiée du Québec ' + c.year + ' (' + c.partner + ')') + ', ' + c.resCm + ' cm, © ' + c.src.owner + ', ' + c.src.license;
+  };
+  // URL GetMap (EPSG:3857, PNG sans perte, transparent hors couverture) pour l'emprise Mercator bb
+  B.orthoUrl = function(c, bb, w, h){
+    return c.src.url + '?service=WMS&version=1.3.0&request=GetMap&layers=' + encodeURIComponent(c.layer) + '&styles=&crs=EPSG:3857&bbox=' + bb.map(function(v){ return v.toFixed(2); }).join(',') +
+      '&width=' + w + '&height=' + h + '&format=image/png&transparent=true';
+  };
+
   root.QA_MOD = root.QA_MOD || {};
   root.QA_MOD.bloc3dCalc = B;
   if (typeof module !== 'undefined' && module.exports) module.exports = B;
