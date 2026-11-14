@@ -7,7 +7,7 @@
 (function(root){
   'use strict';
   var R = 6378137, MAX_CELLS = 1500000, MAX_SIDE = 1500;
-  var B = { R: R, MAX_CELLS: MAX_CELLS, MAX_SIDE: MAX_SIDE, SOURCE: 'QuickerAtlas v0.7.5' };
+  var B = { R: R, MAX_CELLS: MAX_CELLS, MAX_SIDE: MAX_SIDE, SOURCE: 'QuickerAtlas v0.7.7' };
 
   // ---------- Repère ----------
   B.merc = function(lat, lon){ return [lon * Math.PI / 180 * R, Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * R]; };
@@ -114,12 +114,13 @@
   // ---------- Paquet `bs3d-terrain` v1 ----------
   // o = { frame: {lat, lon}, grid, mnt, mns|null, image|null, zones[], bridge|null, attribution[], source?, created? }
   B.buildPacket = function(o){
-    return {
+    var pk = {
       type: 'bs3d-terrain', version: 1, source: o.source || B.SOURCE, created: o.created || new Date().toISOString(),
       center: { lat: o.frame.lat, lon: o.frame.lon },
       // v0.7.5 : bloc incliné : `rotation` (degrés, sens horaire) = azimut de l'axe y de la grille ; absent = nord en haut
       grid: (function(){ var g = { cols: o.grid.cols, rows: o.grid.rows, cell: o.grid.cell, x0: o.grid.x0, y0: o.grid.y0 }; if (o.rotation) g.rotation = Math.round(o.rotation * 100) / 100; return g; })(),
       mnt: o.mnt, mns: o.mns || null, image: o.image || null,
+      // v0.7.6 : `image.label` ; v0.7.7 : `images` (facultatif) = les autres options d'image, pour basculer dans BridgeSketch 3D
       zones: (o.zones || []).map(function(z){
         var q = { type: z.type, source: z.source || 'user' };
         if (z.type === 'road') {
@@ -145,6 +146,8 @@
       bridge: o.bridge ? { axis: [[o.bridge.axis[0][0], o.bridge.axis[0][1]], [o.bridge.axis[1][0], o.bridge.axis[1][1]]], structure: o.bridge.structure || null } : null,
       attribution: (o.attribution || []).slice()
     };
+    if (o.images && o.images.length) pk.images = o.images.slice();
+    return pk;
   };
   function gridLen(v, n){
     if (v == null) return null;
@@ -173,7 +176,9 @@
       if (lm !== n * 4) e.push('mnt : longueur ' + lm + ' au lieu de ' + n * 4 + ' octets');
       if (p.mns !== null && p.mns !== undefined && ls !== n * 4) e.push('mns : longueur ' + ls + ' au lieu de ' + n * 4 + ' octets');
     }
-    if (p.image !== null && p.image !== undefined && (typeof p.image.dataUrl !== 'string' || p.image.dataUrl.indexOf('data:image/') !== 0 || typeof p.image.attribution !== 'string')) e.push('image');
+    var okImg = function(m){ return m && typeof m.dataUrl === 'string' && m.dataUrl.indexOf('data:image/') === 0 && typeof m.attribution === 'string' && (m.label === undefined || typeof m.label === 'string'); };
+    if (p.image !== null && p.image !== undefined && !okImg(p.image)) e.push('image');
+    if (p.images !== undefined && (!Array.isArray(p.images) || !p.images.every(okImg))) e.push('images');
     if (!Array.isArray(p.zones)) e.push('zones');
     else p.zones.forEach(function(z, i){
       var okSrc = z && ['osm', 'auto', 'user'].indexOf(z.source) >= 0, pts = z && (z.type === 'road' ? z.line : z.polygon);
@@ -788,6 +793,76 @@
   B.orthoUrl = function(c, bb, w, h){
     return c.src.url + '?service=WMS&version=1.3.0&request=GetMap&layers=' + encodeURIComponent(c.layer) + '&styles=&crs=EPSG:3857&bbox=' + bb.map(function(v){ return v.toFixed(2); }).join(',') +
       '&width=' + w + '&height=' + h + '&format=image/png&transparent=true';
+  };
+
+  // ---------- v0.7.7 : images du paquet ----------
+  B.ESRI_LABEL = 'Satellite Esri';
+  B.imageLabel = function(c){ return B.orthoLabel(c); };
+  // Taille (px) d'un aperçu agrandi : plus grand côté = `long` px, sans dépasser la finesse native de l'orthophoto (100 / resCm px par m)
+  B.previewSize = function(wM, hM, resCm, long){
+    var sc = long / Math.max(wM, hM);
+    if (resCm > 0) sc = Math.min(sc, 100 / resCm);
+    return { w: Math.max(16, Math.round(wM * sc)), h: Math.max(16, Math.round(hM * sc)) };
+  };
+  // Position suivante dans une liste circulaire (flèches de la visionneuse)
+  B.stepIndex = function(n, i, d){ return n > 0 ? (((i + d) % n) + n) % n : 0; };
+  // opts = [{ key, label, attribution, dataUrl }] (les options prêtes) ; sel = clé de l'image principale ; all = joindre les autres.
+  // Renvoie { image: { dataUrl, attribution, label } | null, images: [...] } : `images` = les AUTRES options, jamais le doublon de `image`.
+  B.imageSet = function(opts, sel, all){
+    var pick = function(o){ return { dataUrl: o.dataUrl, attribution: o.attribution, label: o.label }; };
+    var main = null, rest = [];
+    (opts || []).forEach(function(o){ if (!o || !o.dataUrl) return; if (main === null && o.key === sel) main = o; else if (o.key !== sel) rest.push(o); });
+    return { image: main ? pick(main) : null, images: all ? rest.map(pick) : [] };
+  };
+
+  // Image sous l'ancien pont : dans le couloir de B.removeBridge (axe, demi-largeur width/2 + 2 m), les pixels sont refaits par
+  // interpolation perpendiculaire à l'axe entre les deux rives (moyenne de 4 échantillons à 0,5-3,5 m au-delà du bord adouci) : la route,
+  // l'eau, l'herbe ou la forêt de part et d'autre se prolonge sous l'ouvrage. Seulement entre les bouts de l'axe (+ marge) ; bord adouci
+  // sur `feather` m ; échantillons décalés le long de l'axe par un bruit lent (pas de rayures droites) et luminosité très légèrement
+  // modulée (`noise`, 0 = aucune). px = RGBA (Uint8ClampedArray ou Array) modifié sur place ; image w × h px couvrant le bloc
+  // (wM × hM m, centré sur l'origine, nord/y vers le haut, comme la grille). Renvoie le nombre de pixels touchés.
+  B.fillImageCorridor = function(px, w, h, wM, hM, axis, width, o){
+    o = o || {};
+    var a = axis[0], b = axis[1], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (!(L > 1) || !(w > 1) || !(h > 1)) return 0;
+    var feather = o.feather != null ? o.feather : 1.8, margin = o.margin != null ? o.margin : 3, noise = o.noise != null ? o.noise : 0.02, jit = o.jitter != null ? o.jitter : 1.5;
+    var ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, nx = -uy, ny = ux, hw = Math.max(2, (width || 12) / 2) + 2, reach = hw + feather;
+    var kx = w / wM, ky = h / hM, memo = {}, touched = 0;
+    var at = function(x, y){            // pixel (RGBA) à la position locale (x, y), ou null hors de l'image
+      var c = Math.floor(x * kx + w / 2), r = Math.floor(h / 2 - y * ky);
+      if (c < 0 || r < 0 || c >= w || r >= h) return null;
+      return (r * w + c) * 4;
+    };
+    var side = function(t, sgn){
+      var s = [0, 0, 0], n = 0, tj = t + jit * (0.6 * Math.sin(0.31 * t) + 0.4 * Math.sin(0.83 * t + 1)), k, i;
+      for (k = 0; k < 4; k++) {
+        var u = sgn * (reach + 0.5 + k), p = at(a[0] + ux * tj + nx * u, a[1] + uy * tj + ny * u);
+        if (p !== null) { for (i = 0; i < 3; i++) s[i] += px[p + i]; n++; }
+      }
+      return n ? [s[0] / n, s[1] / n, s[2] / n] : null;
+    };
+    var xs = [a[0] + nx * reach, a[0] - nx * reach, b[0] + nx * reach, b[0] - nx * reach], ys = [a[1] + ny * reach, a[1] - ny * reach, b[1] + ny * reach, b[1] - ny * reach];
+    var c0 = Math.max(0, Math.floor(Math.min.apply(null, xs) * kx + w / 2) - margin * kx - 2), c1 = Math.min(w - 1, Math.ceil(Math.max.apply(null, xs) * kx + w / 2) + margin * kx + 2);
+    var r0 = Math.max(0, Math.floor(h / 2 - Math.max.apply(null, ys) * ky) - margin * ky - 2), r1 = Math.min(h - 1, Math.ceil(h / 2 - Math.min.apply(null, ys) * ky) + margin * ky + 2);
+    c0 = Math.floor(c0); r0 = Math.floor(r0); c1 = Math.ceil(c1); r1 = Math.ceil(r1);
+    var smooth = function(v){ v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); };
+    for (var r = r0; r <= r1; r++) for (var c = c0; c <= c1; c++) {
+      var x = (c + 0.5 - w / 2) / kx - a[0], y = (h / 2 - r - 0.5) / ky - a[1], t = x * ux + y * uy, u = x * nx + y * ny, au = Math.abs(u);
+      if (au > reach || t < -margin || t > L + margin) continue;
+      var al = au <= hw ? 1 : smooth(1 - (au - hw) / feather);
+      if (t < 0) al *= smooth(1 + t / margin); else if (t > L) al *= smooth(1 - (t - L) / margin);
+      if (al <= 0) continue;
+      var key = Math.round(t * kx), sd = memo[key] || (memo[key] = [side(t, -1), side(t, 1)]), sl = sd[0], sr = sd[1];
+      if (!sl && !sr) continue;
+      var f = sl && sr ? Math.max(0, Math.min(1, (u + hw) / (2 * hw))) : sl ? 0 : 1, p = (r * w + c) * 4, i,
+        m = 1 + noise * (Math.sin(0.23 * t + 0.11 * u) + 0.7 * Math.sin(0.57 * t - 0.29 * u + 2));
+      for (i = 0; i < 3; i++) {
+        var v = (sl ? sl[i] : sr[i]) * (1 - f) + (sr ? sr[i] : sl[i]) * f;
+        px[p + i] = Math.max(0, Math.min(255, Math.round(px[p + i] * (1 - al) + v * m * al)));
+      }
+      touched++;
+    }
+    return touched;
   };
 
   root.QA_MOD = root.QA_MOD || {};

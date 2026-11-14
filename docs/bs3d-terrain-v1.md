@@ -86,6 +86,19 @@ Ajouts compatibles de 2026-11-13 (QA v0.7.6), toujours `version: 1` :
 - Taille du fichier : un paquet avec orthophoto pèse typiquement 15 à 30 Mo en JSON (image en base64 comprise) ; BridgeSketch 3D doit
   accepter des textures jusqu'à 8 192 px et des paquets de cet ordre (`postMessage` et fichier `.bs3dterrain`).
 
+Ajouts compatibles de 2026-11-14 (QA v0.7.7), toujours `version: 1` :
+- **`image.label`** (facultatif, texte) : nom court de l'image, par ex. « Orthophoto 2025 · 10 cm » ou « Satellite Esri ».
+- **`images`** (facultatif) : `[{ dataUrl, attribution, label }]`, les AUTRES images disponibles pour le bloc (orthophotos et Esri), à
+  basculer à la volée dans BS3D ; l'image déjà dans `image` n'y figure jamais (pas de base64 en double). Mêmes règles de format que `image`
+  (`data:image/png|jpeg;base64,…`, même emprise que la grille, bloc incliné redressé, jusqu'à 8 192 px). Présent seulement quand l'utilisateur
+  coche « Joindre toutes les images » dans QA ; sinon le paquet ne change pas (hormis `image.label`). Un lecteur qui l'ignore fonctionne comme
+  avant. Taille : chaque image peut peser jusqu'à ≈ 25 Mo en base64, le paquet se compte donc en dizaines de Mo. Leurs crédits sont repris dans
+  `attribution[]`.
+- **Image sous l'ancien pont** : quand QA retire le pont existant du relief (axe fourni, case « Retirer le pont existant » cochée), `image` et
+  chaque entrée de `images` sont aussi refaites dans le couloir du tablier (interpolation perpendiculaire à l'axe entre les deux rives, bord
+  adouci) : la route, l'eau, l'herbe ou la forêt de part et d'autre se prolonge sous l'ouvrage. Même format qu'avant (PNG reste PNG, JPEG au
+  même niveau de qualité). Rien à faire côté lecteur.
+
 ## Transport
 
 1. **BS3D ouvre QA** : bouton « IMPORT MNT/MNS » → `window.open(QA_URL + '?bs3d=1')`. QA en mode `bs3d` affiche un

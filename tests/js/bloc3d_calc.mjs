@@ -308,7 +308,7 @@ ok('paquet v0.7.5 : rotation de la grille, attributs de route, densité ; herbe 
   assert.deepEqual([pk.zones[2].density, pk.zones[3].density, pk.zones[4].density], [2.5, 3, undefined]);
   assert.deepEqual(B.validatePacket(pk), []);
   assert.equal(B.buildPacket(base).grid.rotation, undefined, 'pas de rotation : champ absent (lecteurs plus anciens)');
-  assert.equal(B.SOURCE, 'QuickerAtlas v0.7.5');
+  assert.equal(B.SOURCE, 'QuickerAtlas v0.7.7');
   // herbe du 13741 sur l'imagerie : champ vert sombre, terre-plein, champ jauni ; pas l'asphalte, ni l'eau, ni un sol rouge
   assert.ok(B.oliveGreen(98, 102, 69) && B.oliveGreen(83, 100, 59) && B.oliveGreen(128, 120, 94));
   assert.ok(!B.oliveGreen(120, 120, 118) && !B.oliveGreen(40, 60, 90) && !B.oliveGreen(160, 110, 80) && !B.oliveGreen(20, 30, 12));
@@ -378,6 +378,63 @@ ok('orthophotos v0.7.6 : couverture (image vide = hors couverture), plan de tél
   assert.equal(B.ORTHO.JPEG_Q, 0.98);
   var u = B.orthoUrl(B.rankOrtho(B.orthoCandidates([{ name: 'Orthomosaique_2025_2025_Partenariat_X_10cm_RVB', bbox: [-80, 40, -60, 60] }]), [-71, 48, -70, 49])[0], [-7900000, 6200000, -7899000.123, 6201000], 512, 512);
   assert.ok(/format=image\/png&transparent=true$/.test(u) && /crs=EPSG:3857/.test(u) && /bbox=-7900000\.00,6200000\.00,-7899000\.12,6201000\.00/.test(u));
+});
+
+ok('v0.7.7 : image.label, images[] (les autres options, sans doublon) et validation', function(){
+  var opts = [{ key: 0, label: 'Orthophoto 2025 · 10 cm', attribution: 'A', dataUrl: 'data:image/png;base64,AA' }, { key: 1, label: 'Orthophoto 2020 · 20 cm', attribution: 'B', dataUrl: 'data:image/jpeg;base64,BB' },
+    { key: 'esri', label: B.ESRI_LABEL, attribution: 'Esri World Imagery', dataUrl: 'data:image/jpeg;base64,CC' }, { key: 2, label: 'pas prête', attribution: 'D', dataUrl: null }];
+  var off = B.imageSet(opts, 0, false);
+  assert.deepEqual(off.image, { dataUrl: 'data:image/png;base64,AA', attribution: 'A', label: 'Orthophoto 2025 · 10 cm' });
+  assert.deepEqual(off.images, [], 'case décochée : aucune image jointe');
+  var on = B.imageSet(opts, 'esri', true);
+  assert.equal(on.image.label, 'Satellite Esri');
+  assert.deepEqual(on.images.map(function(m){ return m.label; }), ['Orthophoto 2025 · 10 cm', 'Orthophoto 2020 · 20 cm'], 'les autres, sans l\'image principale ni l\'option non prête');
+  assert.ok(on.images.every(function(m){ return m.dataUrl !== on.image.dataUrl; }));
+  assert.equal(B.imageSet(opts, 7, true).image, null);
+  assert.equal(B.imageLabel({ year: 2025, resCm: 10 }), 'Orthophoto 2025 · 10 cm');
+  var base = { frame: { lat: 46, lon: -71 }, grid: B.gridFor(60, 40, 1), mnt: new Float32Array(60 * 40), image: on.image };
+  assert.equal('images' in B.buildPacket(base), false, 'sans la case : paquet inchangé (plus image.label)');
+  var p = B.buildPacket(Object.assign({ images: on.images }, base));
+  assert.equal(p.images.length, 2); assert.deepEqual(B.validatePacket(p), []);
+  assert.ok(B.validatePacket(Object.assign({}, p, { images: [{ dataUrl: 'x', attribution: 'y' }] })).indexOf('images') >= 0);
+  assert.ok(B.validatePacket(Object.assign({}, p, { image: { dataUrl: 'data:image/png;base64,AA', attribution: 'a', label: 3 } })).indexOf('image') >= 0);
+});
+ok('v0.7.7 : taille de l\'aperçu agrandi et navigation circulaire', function(){
+  assert.deepEqual(B.previewSize(600, 400, 10, 1600), { w: 1600, h: 1067 });
+  assert.deepEqual(B.previewSize(100, 100, 20, 1600), { w: 500, h: 500 }, 'jamais au-delà de la finesse native (5 px/m)');
+  assert.equal(B.stepIndex(3, 2, 1), 0); assert.equal(B.stepIndex(3, 0, -1), 2); assert.equal(B.stepIndex(1, 0, 1), 0);
+});
+function rgba(w, h, f){ var a = new Uint8ClampedArray(w * h * 4); for (var r = 0; r < h; r++) for (var c = 0; c < w; c++) { var q = f(c, r), i = (r * w + c) * 4; a[i] = q[0]; a[i + 1] = q[1]; a[i + 2] = q[2]; a[i + 3] = 255; } return a; }
+ok('v0.7.7 : image sous l\'ancien pont, même couleur des deux côtés = couloir comblé, hors couloir intact', function(){
+  // bloc 100 × 100 m, 4 px/m ; axe est-ouest de -30 à 30 m, tablier de 10 m (couloir de ±7 m) rouge sur sol vert
+  var w = 400, h = 400, k = 4, deck = [200, 30, 30], ground = [40, 160, 60];
+  var px = rgba(w, h, function(c, r){ var x = (c + 0.5 - w / 2) / k, y = (h / 2 - r - 0.5) / k; return Math.abs(y) <= 5 && Math.abs(x) <= 32 ? deck : ground; });
+  var ref = new Uint8ClampedArray(px), n = B.fillImageCorridor(px, w, h, 100, 100, [[-30, 0], [30, 0]], 10, { noise: 0 });
+  assert.ok(n > 0);
+  var at = function(x, y){ var i = (Math.floor(h / 2 - y * k) * w + Math.floor(x * k + w / 2)) * 4; return [px[i], px[i + 1], px[i + 2]]; };
+  assert.deepEqual(at(0, 0), ground, 'centre du tablier'); assert.deepEqual(at(-20, 4), ground); assert.deepEqual(at(25, -6), ground);
+  assert.deepEqual(at(0, 20), ground, 'hors couloir : intact'); assert.deepEqual(at(45, 0), ground, 'au-delà du bout : intact');
+  var far = 0; for (var i = 0; i < px.length; i++) if (px[i] !== ref[i] && Math.abs((Math.floor(i / 4 / w) - h / 2 + 0.5) / k) > 11) far++;
+  assert.equal(far, 0, 'rien de modifié à plus de 11 m de l\'axe');
+  // bruit par défaut : écart de quelques niveaux seulement
+  var px2 = rgba(w, h, function(){ return ground; }); B.fillImageCorridor(px2, w, h, 100, 100, [[-30, 0], [30, 0]], 10);
+  var worst = 0; for (var j = 0; j < px2.length; j += 4) worst = Math.max(worst, Math.abs(px2[j + 1] - ground[1]));
+  assert.ok(worst > 0 && worst <= 12, 'bruit léger (écart max ' + worst + ')');
+});
+ok('v0.7.7 : image sous l\'ancien pont, deux couleurs de rive = dégradé continu, bord adouci', function(){
+  var w = 400, h = 400, k = 4, A = [20, 40, 200], Bc = [220, 200, 20];
+  // eau (bleue) au sud de l'axe, herbe (jaune) au nord ; tablier gris dans le couloir
+  var px = rgba(w, h, function(c, r){ var y = (h / 2 - r - 0.5) / k, x = (c + 0.5 - w / 2) / k; return Math.abs(y) <= 5 && Math.abs(x) <= 32 ? [120, 120, 120] : y < 0 ? A : Bc; });
+  B.fillImageCorridor(px, w, h, 100, 100, [[-30, 0], [30, 0]], 10, { noise: 0, jitter: 0 });
+  var at = function(x, y){ var i = (Math.floor(h / 2 - y * k) * w + Math.floor(x * k + w / 2)) * 4; return [px[i], px[i + 1], px[i + 2]]; };
+  var prev = -1;
+  for (var y = -6; y <= 6; y += 1) { var v = at(0, y)[0]; assert.ok(v >= prev, 'monotone du sud au nord à y=' + y); prev = v; }
+  assert.ok(at(0, -6.5)[2] > 150 && at(0, 6.5)[0] > 150, 'près des rives : couleur de la rive');
+  var mid = at(0, 0); assert.ok(mid[0] > 80 && mid[0] < 160, 'au milieu : mélange');
+  assert.ok(at(0, -7.5)[0] < 80 && at(0, 7.5)[0] > 150, 'juste hors du couloir (bord adouci) : couleurs de rive');
+  assert.deepEqual(at(0, -12), A); assert.deepEqual(at(0, 12), Bc);
+  assert.ok(Math.abs(at(-31, 0)[0] - at(-33, 0)[0]) < 200, 'bout du tablier : pas d\'exception');
+  assert.equal(B.fillImageCorridor(px, w, h, 100, 100, [[0, 0], [0, 0]], 10), 0, 'axe nul : rien');
 });
 
 console.log(n + ' essais Bloc 3D : ok');

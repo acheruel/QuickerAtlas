@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QuickerAtlas v0.7.6 · Atlas d’ouvrages d’art au Québec</title>
+<title>QuickerAtlas v0.7.7 · Atlas d’ouvrages d’art au Québec</title>
 <!-- v0.6.7 : titre et description repris dans l'aperçu des liens partagés (Teams, courriel, réseaux : balises Open Graph) -->
 <meta name="description" content="Visualisation moderne de l’inventaire des structures du MTMD au Québec, avec ma touche personnelle : profil LiDAR, données des cours d’eau, sismiques, etc. ! À partir de données publiques.">
 <meta property="og:type" content="website">
@@ -388,6 +388,25 @@ body.view-x3d .workspace.workspace{grid-template-columns:minmax(0,1fr)!important
 .x3d-opt b{font-size:.8rem}.x3d-opt small{display:block;color:var(--muted);font-size:.72rem;line-height:1.35}
 .x3d-opt em{font-style:normal;font-size:.64rem;font-weight:700;color:#00534f;background:#d9f5eb;border-radius:8px;padding:1px 6px;margin-left:4px;white-space:nowrap}
 .x3d-optst.ok{color:#00534f}.x3d-optst.err{color:var(--amber)}
+.x3d-opt img[data-act=zoom]{cursor:zoom-in}
+.x3d-zoom{margin-top:3px;padding:2px 8px;font-size:.7rem;justify-self:start}
+/* v0.7.7 : visionneuse des images du site */
+.x3d-lb{position:fixed;inset:0;z-index:2500;background:#0a1c29d9;display:flex;align-items:center;justify-content:center;padding:16px}
+.x3d-lb-card{display:flex;flex-direction:column;width:min(1280px,100%);max-height:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 18px 60px #000a}
+.x3d-lb-head{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.x3d-lb-head>div{flex:1;min-width:0}.x3d-lb-head b{display:block;font-size:.95rem}.x3d-lb-head small{display:block;color:var(--muted);font-size:.72rem;line-height:1.35}
+.x3d-lb-n{font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.x3d-lb-head>button{font-size:1.3rem;line-height:1;padding:2px 10px}
+.x3d-lb-stage{position:relative;flex:1;min-height:200px;display:flex;align-items:center;justify-content:center;background:#0f1d27;overflow:hidden}
+.x3d-lb-stage img{max-width:100%;max-height:calc(100vh - 190px);object-fit:contain;display:block}
+.x3d-lb-stage img:not([src]){display:none}
+.x3d-lb-wait{position:absolute;inset:0;display:grid;place-items:center;color:#cfe0ea;font-size:.85rem;pointer-events:none}
+.x3d-lb-wait[hidden]{display:none}
+.x3d-lb-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:42px;height:56px;font-size:1.8rem;line-height:1;border-radius:10px;background:#ffffffd9;padding:0}
+.x3d-lb-nav[data-lb=prev]{left:10px}.x3d-lb-nav[data-lb=next]{right:10px}
+.x3d-lb-foot{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--line)}
+.x3d-lb-foot small{color:var(--muted);font-size:.74rem}
+@media (max-width:600px){.x3d-lb{padding:0}.x3d-lb-card{border-radius:0;height:100%}.x3d-lb-foot{flex-direction:column;align-items:stretch}}
 .x3d-warns{margin:0;padding:6px 8px 6px 22px;border-radius:6px;background:#fff6dc;font-size:.74rem}
 .x3d-sec{display:flex;flex-direction:column;gap:7px;padding-top:10px;border-top:1px solid var(--line)}
 .x3d-fam{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
@@ -1109,7 +1128,7 @@ table.list tbody tr:hover{background:#eef5f7}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="data/structures.js"></script>
 <script src="data/details.js"></script>
-<script>window.PQ_META={"version": "0.7.6", "date": "2026-11-13", "author": "Anthony Chéruel"};</script>
+<script>window.PQ_META={"version": "0.7.7", "date": "2026-11-14", "author": "Anthony Chéruel"};</script>
 <script>
 (function(){
   'use strict';

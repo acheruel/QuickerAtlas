@@ -10,6 +10,8 @@
    v0.7.6 : image du site au choix : jusqu'à 3 orthophotos ouvertes du Québec (MERN, GéoMont ; CC BY 4.0), les plus récentes qui
    couvrent le bloc, à la finesse native (plafond 8 192 px), en PNG sans perte tant que l'image reste sous 25 Mo, sinon JPEG 0,98 ;
    Esri reste le repli et l'image de la détection des zones (calibrée sur Esri). Choix dans le volet, avec aperçus.
+   v0.7.7 : aperçu en grand de chaque option (visionneuse, flèches, « Choisir cette image ») ; case « Joindre toutes les images » :
+   `images[]` du paquet = les autres options, pour basculer dans BridgeSketch 3D ; l'image est aussi refaite sous l'ancien pont retiré.
    Module chargé à la demande (js/lidar.js et js/bloc3d-calc.js d'abord). Contrat : window.QA_MOD.bloc3d.show(host, o, opt).
    Les calculs purs sont dans js/bloc3d-calc.js (testés par tests/js/bloc3d_calc.mjs). ES5. */
 (function(){
@@ -28,7 +30,7 @@
   var ORDER = ['river', 'water', 'forest', 'grass', 'road'];
   var S = { host: null, map: null, side: null, bar: null, o: null, bs3d: false, mode: 'select', rect: null, blk: null, grid: null, rectL: null, handles: [], drawing: false, run: 0,
     data: null, zones: [], axis: null, axisSrc: null, sel: [], zl: {}, vh: [], tool: null, svg: null, nextId: 1, steps: [], status: null, sending: null, undo: [], box: false, dots: null, side0: 600, strip: true,
-    rot0: 0, win: null, tabs: {}, bc: null, ortho: null, orthoCands: null, me: 'qa-' + Math.random().toString(36).slice(2, 10), ackCore: null };
+    rot0: 0, win: null, tabs: {}, bc: null, ortho: null, orthoCands: null, allImg: false, clean: null, cleaning: false, lb: null, me: 'qa-' + Math.random().toString(36).slice(2, 10), ackCore: null };
   var $ = function(s){ return S.host.querySelector(s); };
 
   // ---------- Outils ----------
@@ -220,7 +222,7 @@
   }
   // v0.7.5 : si une fenêtre BridgeSketch 3D est déjà ouverte, on propose d'y envoyer le bloc, ou d'en ouvrir une nouvelle
   function footHtml(){
-    var dis = S.sending || imgBusy() ? ' disabled' : '', t = targets(), h = '<div class="x3d-foot">' + (imgBusy() ? '<small class="x3d-note">Image en cours de téléchargement : l’envoi sera possible dans un instant.</small>' : '');
+    var dis = S.sending || imgBusy() ? ' disabled' : '', t = targets(), h = '<div class="x3d-foot">' + (imgBusy() ? '<small class="x3d-note">' + (S.cleaning ? 'Image en préparation' : S.allImg ? 'Images en cours de téléchargement' : 'Image en cours de téléchargement') + ' : l’envoi sera possible dans un instant.</small>' : '');
     if (S.bs3d && window.opener && !window.opener.closed) h += '<button type="button" class="x3d-pri x3d-big" data-act="send"' + dis + '>Envoyer vers BridgeSketch 3D</button>';
     else if (t.length) {
       h += '<div class="x3d-h">BridgeSketch 3D est déjà ouvert</div>';
@@ -473,12 +475,63 @@
       return next().then(function(){ return { list: found, fails: ok ? 0 : fails, tried: Math.min(i, ranked.length) }; });
     });
   }
-  function imgBusy(){ return !!(S.ortho && S.ortho.sel !== 'esri' && S.ortho.list[S.ortho.sel] && S.ortho.list[S.ortho.sel].state === 'busy'); }
+  // v0.7.7 : avec « Joindre toutes les images », l'envoi attend aussi les autres orthophotos (en cours ou en file) ; S.cleaning = image en cours de refonte sous l'ancien pont
+  function imgBusy(){
+    var o = S.ortho;
+    if (S.cleaning) return true;
+    if (o && S.allImg && o.list.some(function(it){ return it.state === 'busy' || it.state === 'idle'; })) return true;
+    return !!(o && o.sel !== 'esri' && o.list[o.sel] && o.list[o.sel].state === 'busy');
+  }
   // Image du paquet : l'orthophoto choisie (une fois téléchargée), sinon Esri
   function currentImage(){
     var o = S.ortho, d = S.data, it = o && o.sel !== 'esri' ? o.list[o.sel] : null;
-    if (it && it.res) return { dataUrl: it.res.dataUrl, attribution: C.orthoCredit(it.c), ortho: true, res: it.res };
-    return d && d.jpeg ? { dataUrl: d.jpeg, attribution: 'Esri World Imagery', ortho: false } : null;
+    if (it && it.res) return { key: o.sel, label: C.imageLabel(it.c), dataUrl: it.res.dataUrl, attribution: C.orthoCredit(it.c), ortho: true, res: it.res };
+    return d && d.jpeg ? { key: 'esri', label: C.ESRI_LABEL, dataUrl: d.jpeg, attribution: 'Esri World Imagery', ortho: false } : null;
+  }
+  // v0.7.7 : toutes les options prêtes (orthophotos téléchargées + Esri)
+  function imageOptions(){
+    var o = S.ortho, d = S.data, out = [];
+    if (o) o.list.forEach(function(it, i){ if (it.res) out.push({ key: i, label: C.imageLabel(it.c), attribution: C.orthoCredit(it.c), dataUrl: it.res.dataUrl, q: C.ORTHO.JPEG_Q }); });
+    if (d && d.jpeg) out.push({ key: 'esri', label: C.ESRI_LABEL, attribution: 'Esri World Imagery', dataUrl: d.jpeg, q: 0.9 });
+    return out;
+  }
+  // ---------- v0.7.7 : image refaite sous l'ancien pont ----------
+  // Même condition que le relief (axe placé + case cochée) ; le résultat est gardé tant que l'axe, la largeur et l'image ne changent pas.
+  function cleanKey(){ return S.axis && S.strip ? JSON.stringify([S.axis, deckWidth()]) : ''; }
+  function cleanedUrl(o){
+    var e = S.clean && S.clean.key === cleanKey() && S.clean.map[o.key];
+    return e && e.src === o.dataUrl ? e.out : o.dataUrl;
+  }
+  function cleanOne(url, q){
+    return fetch(url).then(function(r){ return r.blob(); }).then(function(b){ return createImageBitmap(b); }).then(function(bm){
+      var cv = document.createElement('canvas'), g;
+      cv.width = bm.width; cv.height = bm.height; g = cv.getContext('2d'); g.drawImage(bm, 0, 0); if (bm.close) bm.close();
+      var id = g.getImageData(0, 0, cv.width, cv.height);
+      C.fillImageCorridor(id.data, cv.width, cv.height, S.blk.wM, S.blk.hM, S.axis, deckWidth());
+      g.putImageData(id, 0, 0);
+      return canvasBlob(cv, /^data:image\/png/.test(url) ? 'image/png' : 'image/jpeg', q).then(blobDataUrl).then(function(u){ cv.width = cv.height = 0; return u; });
+    });
+  }
+  function cleanImages(){
+    var key = cleanKey(); if (!key || !S.data) return Promise.resolve();
+    if (!S.clean || S.clean.key !== key) S.clean = { key: key, map: {} };
+    var cl = S.clean, im = currentImage(), raw = imageOptions().filter(function(o){ return S.allImg || (im && o.key === im.key); }), p = Promise.resolve();
+    raw.forEach(function(o){
+      if (cl.map[o.key] && cl.map[o.key].src === o.dataUrl) return;
+      p = p.then(function(){
+        return cleanOne(o.dataUrl, o.q).then(function(u){ cl.map[o.key] = { src: o.dataUrl, out: u }; }, function(e){
+          if (window.console) console.warn('Image sous l’ancien pont : ' + errText(e)); cl.map[o.key] = { src: o.dataUrl, out: o.dataUrl };
+        });
+      });
+    });
+    return p;
+  }
+  // Prépare les images (refonte sous l'ancien pont) puis appelle fn ; le bouton d'envoi reste grisé pendant ce temps
+  function prep(fn){
+    if (!cleanKey()) { fn(); return; }
+    S.cleaning = true; status('busy', 'Harmonisation de l’image sous l’ancien pont…');
+    var go = function(){ S.cleaning = false; if (S.data) fn(); else render(); };
+    cleanImages().then(go, go);
   }
   function imgNote(o, i){
     if (S.ortho !== o) return;
@@ -490,6 +543,7 @@
     if (it.state === 'busy') return it.note;
     if (it.state === 'ok') return 'Prête · ' + it.res.fmt + ' · ' + fmt(it.res.w) + ' × ' + fmt(it.res.h) + ' px · ' + moText(it.res.bytes) + ' · ' + QA.nf1.format(it.res.seconds) + ' s';
     if (it.state === 'err') return 'Échec : ' + it.note + ' (choisir pour réessayer)';
+    if (S.allImg) return 'En attente du téléchargement (une orthophoto à la fois)';
     var o = S.ortho, g = o && o.geo, p = g && C.orthoPlan(2 * g.bi.halfE, 2 * g.bi.halfN, it.c.resCm, C.ORTHO.MAX_PX, it.c.src.tile);
     return p ? 'Se télécharge au choix, jusqu’à ' + fmt(p.nw) + ' × ' + fmt(p.nh) + ' px' : '';
   }
@@ -530,6 +584,7 @@
           it.res = { dataUrl: url, fmt: r.fmt, bytes: r.blob.size, pngBytes: r.pngBytes, w: out.width, h: out.height, tiles: total, seconds: (performance.now() - t0) / 1000 };
           it.state = 'ok'; out.width = out.height = 0;
           if (S.mode === 'edit') render();
+          nextAll(o);
         });
       });
     }).catch(function(e){ loadFail(o, i, e); });
@@ -540,6 +595,14 @@
     if (window.console) console.warn('Orthophoto ' + it.c.layer + ' :', e);
     if (o.sel === i && S.data && S.data.jpeg) { o.sel = 'esri'; S.status = { kind: 'busy', html: 'Orthophoto ' + it.c.year + ' indisponible (' + esc(it.note) + ') : l’image Esri est gardée.' }; }
     if (S.mode === 'edit') render();
+    nextAll(o);
+  }
+  // v0.7.7 : « Joindre toutes les images » : les orthophotos se téléchargent l'une après l'autre (on ne martèle pas le serveur).
+  // Une orthophoto en échec n'est pas réessayée toute seule : elle est laissée de côté.
+  function nextAll(o){
+    if (!S.allImg || S.ortho !== o || o.list.some(function(it){ return it.state === 'busy'; })) return;
+    for (var i = 0; i < o.list.length; i++) if (o.list[i].state === 'idle') { loadOrtho(i); return; }
+    if (S.mode === 'edit') render();
   }
   function chooseImage(v){
     var o = S.ortho; if (!o) return;
@@ -548,22 +611,111 @@
     if (o.sel !== 'esri') { if (o.list[o.sel].state === 'err') o.list[o.sel].state = 'idle'; loadOrtho(o.sel); }
     render();
   }
+  function setAllImg(on){
+    S.allImg = !!on; var o = S.ortho;
+    if (on && o) { o.list.forEach(function(it){ if (it.state === 'err') it.state = 'idle'; }); nextAll(o); }
+    render();
+  }
   function imageHtml(){
     var o = S.ortho, d = S.data, h = '<div class="x3d-sec"><div class="x3d-h">Image du site (texture du terrain)</div>';
     if (!o || (!o.list.length && !d.jpeg)) return h + '<p class="x3d-note">Aucune image disponible : le terrain partira sans texture.</p></div>';
     h += '<div class="x3d-imgs" role="radiogroup" aria-label="Image envoyée à BridgeSketch 3D">';
     o.list.forEach(function(it, i){
       h += '<label class="x3d-opt' + (o.sel === i ? ' on' : '') + '"><input type="radio" name="x3d-img" value="' + i + '" data-act="img"' + (o.sel === i ? ' checked' : '') + '>' +
-        (it.prev ? '<img src="' + it.prev + '" alt="Aperçu de l’orthophoto ' + it.c.year + '">' : '<i class="x3d-ph"></i>') +
-        '<span><b>' + esc(C.orthoLabel(it.c)) + (i === 0 ? ' <em>la plus récente</em>' : '') + '</b><small>' + esc(C.orthoSub(it.c)) + '</small><small class="x3d-optst ' + it.state + '" data-img-state="' + i + '">' + esc(optState(it)) + '</small></span></label>';
+        (it.prev ? '<img src="' + it.prev + '" alt="Aperçu de l’orthophoto ' + it.c.year + '" data-act="zoom" data-k="' + i + '" title="Agrandir">' : '<i class="x3d-ph"></i>') +
+        '<span><b>' + esc(C.orthoLabel(it.c)) + (i === 0 ? ' <em>la plus récente</em>' : '') + '</b><small>' + esc(C.orthoSub(it.c)) + '</small><small class="x3d-optst ' + it.state + '" data-img-state="' + i + '">' + esc(optState(it)) + '</small>' +
+        '<button type="button" class="x3d-zoom" data-act="zoom" data-k="' + i + '">Agrandir</button></span></label>';
     });
     if (d.jpeg) h += '<label class="x3d-opt' + (o.sel === 'esri' ? ' on' : '') + '"><input type="radio" name="x3d-img" value="esri" data-act="img"' + (o.sel === 'esri' ? ' checked' : '') + '>' +
-      (d.thumb ? '<img src="' + d.thumb + '" alt="Aperçu de l’image satellite Esri">' : '<i class="x3d-ph"></i>') +
-      '<span><b>Satellite Esri</b><small>Esri World Imagery · repli, 4 px/m au plus, JPEG</small></span></label>';
+      (d.thumb ? '<img src="' + d.thumb + '" alt="Aperçu de l’image satellite Esri" data-act="zoom" data-k="esri" title="Agrandir">' : '<i class="x3d-ph"></i>') +
+      '<span><b>' + C.ESRI_LABEL + '</b><small>Esri World Imagery · repli, 4 px/m au plus, JPEG</small><button type="button" class="x3d-zoom" data-act="zoom" data-k="esri">Agrandir</button></span></label>';
     h += '</div>';
     if (!o.list.length) h += '<p class="x3d-note">' + esc(o.msg || 'Aucune orthophoto ouverte ne couvre ce bloc : image Esri.') + '</p>';
     else h += '<p class="x3d-note">Orthophotos ouvertes du Québec (CC BY 4.0), prises sans perte au serveur ; PNG sans perte dans le paquet tant que l’image reste sous 25 Mo, sinon JPEG 0,98. L’envoi attend la fin du téléchargement.</p>';
+    h += '<label class="x3d-chk"><input type="checkbox" data-act="allimg"' + (S.allImg ? ' checked' : '') + '><span>Joindre toutes les images <small>(bascule dans BridgeSketch 3D) : les autres options partent aussi, jusqu’à ≈ 25 Mo chacune ; l’envoi attend que toutes les orthophotos soient téléchargées.</small></span></label>';
     return h + '</div>';
+  }
+  // ---------- v0.7.7 : aperçu en grand ----------
+  // Visionneuse : l'image la meilleure disponible (téléchargée en entier si elle l'est, sinon aperçu de ≈ 1 600 px demandé au même WMS,
+  // redressé dans le repère du bloc) ; flèches ou touches ← → pour passer d'une option à l'autre, Échap ou clic à côté pour fermer.
+  function lbItems(){
+    var o = S.ortho, d = S.data, out = [];
+    if (o) o.list.forEach(function(it, i){ out.push({ key: i, label: C.imageLabel(it.c), sub: C.orthoCredit(it.c) }); });
+    if (d && d.jpeg) out.push({ key: 'esri', label: C.ESRI_LABEL, sub: 'Esri World Imagery · repli, 4 px/m au plus, JPEG' });
+    return out;
+  }
+  function bigOf(key){
+    var o = S.ortho, d = S.data, it, g, sz;
+    if (key === 'esri') return Promise.resolve({ url: d.jpeg, note: 'Image envoyée telle quelle (JPEG, jusqu’à 4 096 px).' });
+    it = o.list[key]; g = o.geo;
+    if (it.res) return Promise.resolve({ url: it.res.dataUrl, note: 'Image complète : ' + fmt(it.res.w) + ' × ' + fmt(it.res.h) + ' px · ' + it.res.fmt + ' · ' + moText(it.res.bytes) });
+    if (it.bigP) return it.bigP;
+    sz = C.previewSize(2 * g.bi.halfE, 2 * g.bi.halfN, it.c.resCm, 1600);
+    it.bigP = bitmapOf(C.orthoUrl(it.c, g.bbImg, sz.w, sz.h), 60000).then(function(bm){
+      var cv = document.createElement('canvas'); cv.width = sz.w; cv.height = sz.h; cv.getContext('2d').drawImage(bm, 0, 0);
+      var out = blockCanvas(cv, sz.w, sz.h, g.blk, g.bi.halfE), url = out.toDataURL('image/jpeg', 0.92), w = out.width, h = out.height;
+      return { url: url, note: 'Aperçu de ' + fmt(w) + ' × ' + fmt(h) + ' px ; l’image complète se télécharge au choix.' };
+    });
+    it.bigP.catch(function(){ it.bigP = null; });
+    return it.bigP;
+  }
+  function closeLb(){
+    var lb = S.lb; if (!lb) return;
+    document.removeEventListener('keydown', lb.onKey, true); lb.el.remove(); S.lb = null;
+    if (lb.back && lb.back.focus) { try { lb.back.focus(); } catch (e) { /* élément disparu */ } }
+  }
+  function openLb(key){
+    var items = lbItems(), i = 0, k;
+    for (k = 0; k < items.length; k++) if (String(items[k].key) === String(key)) i = k;
+    if (!items.length) return;
+    closeLb();
+    var el = document.createElement('div'), lb = S.lb = { el: el, i: i, items: items, tok: 0, back: document.activeElement };
+    el.className = 'x3d-lb'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Aperçu en grand de l’image du site');
+    el.innerHTML = '<div class="x3d-lb-card"><div class="x3d-lb-head"><div><b data-lb="t"></b><small data-lb="s"></small></div><span class="x3d-lb-n" data-lb="n"></span>' +
+      '<button type="button" data-lb="close" aria-label="Fermer">×</button></div>' +
+      '<div class="x3d-lb-stage"><button type="button" class="x3d-lb-nav" data-lb="prev" aria-label="Image précédente">‹</button><img data-lb="i" alt="">' +
+      '<div class="x3d-lb-wait" data-lb="w">Chargement de l’aperçu…</div><button type="button" class="x3d-lb-nav" data-lb="next" aria-label="Image suivante">›</button></div>' +
+      '<div class="x3d-lb-foot"><small data-lb="note"></small><button type="button" class="x3d-pri" data-lb="choose"></button></div></div>';
+    lb.q = function(n){ return el.querySelector('[data-lb=' + n + ']'); };
+    lb.onKey = function(e){
+      if (e.key === 'Escape') closeLb();
+      else if (e.key === 'ArrowLeft') lbGo(-1);
+      else if (e.key === 'ArrowRight') lbGo(1);
+      else if (e.key === 'Tab') {
+        var f = el.querySelectorAll('button:not(:disabled)'), a = document.activeElement;
+        if (!f.length) return;
+        if (!el.contains(a)) { e.preventDefault(); f[0].focus(); }
+        else if (e.shiftKey && a === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && a === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+        return;
+      }
+      else return;
+      e.preventDefault(); e.stopPropagation();
+    };
+    el.addEventListener('click', function(e){
+      if (e.target === el) { closeLb(); return; }
+      var b = e.target.closest('[data-lb]'), a = b && b.getAttribute('data-lb');
+      if (a === 'close') closeLb(); else if (a === 'prev') lbGo(-1); else if (a === 'next') lbGo(1);
+      else if (a === 'choose') { var k2 = lb.items[lb.i].key; closeLb(); chooseImage(String(k2)); }
+    });
+    document.addEventListener('keydown', lb.onKey, true);
+    document.body.appendChild(el);
+    lbShow(); lb.q('choose').focus();
+  }
+  function lbGo(d){ var lb = S.lb; if (!lb) return; lb.i = C.stepIndex(lb.items.length, lb.i, d); lbShow(); }
+  function lbShow(){
+    var lb = S.lb, q = lb.q, it = lb.items[lb.i], tok = ++lb.tok, o = S.ortho, on = o && String(o.sel) === String(it.key), img = q('i'), wait = q('w');
+    q('t').textContent = it.label; q('s').textContent = it.sub; q('n').textContent = (lb.i + 1) + ' / ' + lb.items.length;
+    q('note').textContent = ''; q('choose').textContent = on ? 'Image choisie ✓' : 'Choisir cette image'; q('choose').disabled = !!on;
+    q('prev').disabled = q('next').disabled = lb.items.length < 2;
+    img.removeAttribute('src'); img.alt = 'Image du site : ' + it.label; wait.textContent = 'Chargement de l’aperçu…'; wait.hidden = false;
+    bigOf(it.key).then(function(r){
+      if (S.lb !== lb || lb.tok !== tok) return;
+      img.src = r.url; wait.hidden = true; q('note').textContent = r.note;
+    }, function(e){
+      if (S.lb !== lb || lb.tok !== tok) return;
+      wait.textContent = 'Aperçu indisponible (' + errText(e) + ').'; wait.hidden = false;
+    });
   }
   function extract(){
     var run = ++S.run, blk = S.blk, F_ = blk.F, grid = S.grid, k = F_.k, warns = [];
@@ -686,7 +838,7 @@
       var l = z.polygon ? L.polygon(zoneLatLngs(z), zoneStyle(z)) : L.polyline(zoneLatLngs(z), zoneStyle(z));
       l.bindTooltip(function(){ return TYPES[z.type].name + (z.level != null ? ' · cote ' + QA.nf2.format(z.level) + ' m' : '') + (z.line ? ' · ' + z.width + ' m' : ''); }, { sticky: true, className: 'b3d-tip' });
       l.on('mousedown', function(e){ zoneDown(z, e); });
-      l.on('click', function(e){ L.DomEvent.stopPropagation(e); });
+      l.on('click', function(e){ if (!S.tool) L.DomEvent.stopPropagation(e); });   // v0.7.7 : pendant un tracé ou la pose de l'axe, le clic sur une zone va à la carte
       l.addTo(S.map); S.zl[z.id] = l;
     });
     showVtx();
@@ -895,12 +1047,14 @@
   function packet(){
     var d = S.data;
     var im = currentImage(), attr = ['MNEHR 1 m © RNCan (OGL-Canada)'];
+    var set = C.imageSet(imageOptions().map(function(o){ return { key: o.key, label: o.label, attribution: o.attribution, dataUrl: cleanedUrl(o) }; }), im ? im.key : null, S.allImg);
     if (im) attr.push(im.attribution);
+    set.images.forEach(function(m){ if (attr.indexOf(m.attribution) < 0) attr.push(m.attribution); });
     if (im && im.ortho && d.jpeg) attr.push('Zones d’herbe détectées d’après Esri World Imagery');
     // v0.7.4 : le pont existant est retiré du relief envoyé (terrain continu sous l'ouvrage), sauf si la case est décochée
     var g = S.axis && S.strip ? C.removeBridge(d.grid, d.mnt, d.mns, S.axis, deckWidth()) : { mnt: d.mnt, mns: d.mns };
     return C.buildPacket({
-      frame: { lat: d.F.lat, lon: d.F.lon }, rotation: d.F.rot || 0, grid: d.grid, mnt: g.mnt, mns: g.mns, image: im ? { dataUrl: im.dataUrl, attribution: im.attribution } : null,
+      frame: { lat: d.F.lat, lon: d.F.lon }, rotation: d.F.rot || 0, grid: d.grid, mnt: g.mnt, mns: g.mns, image: set.image, images: set.images,
       zones: S.zones.map(function(z){ return { type: z.type, source: z.source, polygon: z.polygon, line: z.line, width: z.width, level: z.level }; }),
       bridge: S.axis ? { axis: S.axis, structure: S.o ? { id: String(S.o.num), name: structName(S.o) } : null } : null,
       attribution: attr
@@ -910,6 +1064,9 @@
   function fileName(){ return 'bloc-' + (S.o ? String(S.o.num).replace(/[^\w-]/g, '') : 'carte') + '-' + new Date().toISOString().slice(0, 10) + '.bs3dterrain'; }
   function download(){
     if (imgBusy()) return;
+    prep(downloadNow);
+  }
+  function downloadNow(){
     var p = packet(), errs = C.validatePacket(p);
     if (errs.length) { status('err', 'Paquet non conforme : ' + esc(errs.join(', '))); return; }
     var blob = new Blob([C.packetToJson(p)], { type: 'application/json' }), a = document.createElement('a');
@@ -938,13 +1095,14 @@
     S.ack = { stop: stop };
     return stp(1);
   }
-  function post(target, origin){
+  function post(target, origin){ prep(function(){ postNow(target, origin); }); }
+  function postNow(target, origin){
     var p = packet(), errs = C.validatePacket(p);
     if (errs.length) { status('err', 'Paquet non conforme : ' + esc(errs.join(', '))); return false; }
     var m = C.packetForPost(p), id = 'qa-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
     m.message.transferId = id;
     var mo = (p.mnt.length + (p.mns ? p.mns.length : 0)) * 4 / 1048576,
-      sent = 'Terrain envoyé (' + QA.nf1.format(mo) + ' Mo de grilles' + (p.image ? ' + image de ' + QA.nf1.format(p.image.dataUrl.length * 0.75 / 1048576) + ' Mo' : '') + ', ' + plural(p.zones.length, 'zone', 'zones') + (p.bridge ? ', axe du pont' : ', sans axe') + ').';
+      sent = 'Terrain envoyé (' + QA.nf1.format(mo) + ' Mo de grilles' + (p.image ? ' + image de ' + QA.nf1.format(p.image.dataUrl.length * 0.75 / 1048576) + ' Mo' : '') + (p.images ? ' + ' + plural(p.images.length, 'autre image', 'autres images') + ' (' + QA.nf1.format(p.images.reduce(function(n, m){ return n + m.dataUrl.length * 0.75; }, 0) / 1048576) + ' Mo)' : '') + ', ' + plural(p.zones.length, 'zone', 'zones') + (p.bridge ? ', axe du pont' : ', sans axe') + ').';
     var head = listenAck(target, id, sent);
     target.postMessage(m.message, origin, m.transfer);
     status('ok', head + '<br>' + sent + ' En attente de BridgeSketch 3D…');
@@ -983,6 +1141,9 @@
   function sendTo(i){
     var t = targets()[i]; if (!t || S.sending || imgBusy()) return;
     if (t.kind === 'win') { send(true); return; }
+    prep(function(){ sendToNow(t); });
+  }
+  function sendToNow(t){
     var p = packet(), errs = C.validatePacket(p);
     if (errs.length) { status('err', 'Paquet non conforme : ' + esc(errs.join(', '))); return; }
     var id = 'qa-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8), m = {}, k;
@@ -1034,6 +1195,7 @@
   function onClick(e){
     var b = e.target.closest('[data-act]'); if (!b || b.tagName === 'INPUT' || b.tagName === 'SELECT' || b.disabled) return;
     var act = b.getAttribute('data-act'), t = b.getAttribute('data-t');
+    if (act === 'zoom') { e.preventDefault(); openLb(b.getAttribute('data-k')); return; }
     if (act === 'go') goNum();
     else if (act === 'draw') { if (S.drawing) endDrawRect(true); else startDrawRect(); }
     else if (act === 'sq') {
@@ -1067,6 +1229,7 @@
     var t = e.target, act = t.getAttribute && t.getAttribute('data-act'), zs = selZones();
     if (act === 'strip') { S.strip = t.checked; return; }
     if (act === 'img') { chooseImage(t.value); return; }
+    if (act === 'allimg') { setAllImg(t.checked); return; }
     if (act === 'rot') { var deg = parseFloat(String(t.value).replace(',', '.')); if (isFinite(deg) && S.mode === 'select') { setRot(deg); render(); } return; }
     if (!act || !zs.length) return;
     if (act === 'type' && t.value) { pushUndo(); zs.forEach(function(z){ if (z.polygon) { z.type = t.value; z.source = 'user'; if (z.type !== 'water' && z.type !== 'river') delete z.level; refreshZone(z); } }); render(); }
@@ -1083,7 +1246,7 @@
     else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); select(S.zones.map(function(z){ return z.id; })); }
   }
   function newBlock(){
-    cancelTool(true); clearZoneLayers(); S.data = null; S.ortho = null; S.zones = []; S.axis = null; S.sel = []; S.undo = []; S.mode = 'select'; S.status = null; S.box = false;
+    closeLb(); S.clean = null; cancelTool(true); clearZoneLayers(); S.data = null; S.ortho = null; S.zones = []; S.axis = null; S.sel = []; S.undo = []; S.mode = 'select'; S.status = null; S.box = false;
     render(); if (S.rect) { showRect(S.rect, true); S.rectL.openTooltip(); } drawDots();
   }
 
