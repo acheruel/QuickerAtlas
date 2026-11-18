@@ -7,7 +7,7 @@
 (function(root){
   'use strict';
   var R = 6378137, MAX_CELLS = 1500000, MAX_SIDE = 1500;
-  var B = { R: R, MAX_CELLS: MAX_CELLS, MAX_SIDE: MAX_SIDE, SOURCE: 'QuickerAtlas v0.7.7' };
+  var B = { R: R, MAX_CELLS: MAX_CELLS, MAX_SIDE: MAX_SIDE, SOURCE: 'QuickerAtlas v0.7.8' };
 
   // ---------- Repère ----------
   B.merc = function(lat, lon){ return [lon * Math.PI / 180 * R, Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * R]; };
@@ -147,7 +147,152 @@
       attribution: (o.attribution || []).slice()
     };
     if (o.images && o.images.length) pk.images = o.images.slice();
+    // v0.7.8 : `buildings` (facultatif) = emprises des bâtiments 3D d'OpenFreeMap, dans le repère du bloc (voir B.buildingsFromTile)
+    if (o.buildings && o.buildings.length) pk.buildings = o.buildings.slice();
     return pk;
+  };
+
+  // ---------- Bâtiments 3D d'OpenFreeMap (v0.7.8) ----------
+  // OpenFreeMap sert des tuiles vectorielles (Mapbox Vector Tile, schéma OpenMapTiles, zoom 14 au plus, CORS ouvert, sans clé).
+  // La couche `building` porte `render_height` et `render_min_height` (m) ; `hide_3d` marque le contour d'un bâtiment déjà décrit
+  // par ses parties (à ignorer). Décodeur maison (protobuf minimal) : pas de dépendance.
+  B.OFM_TILEJSON = 'https://tiles.openfreemap.org/planet';
+  B.OFM_ZOOM = 14;
+  B.OFM_ATTR = 'Bâtiments 3D : OpenFreeMap © OpenMapTiles, données © contributeurs OpenStreetMap (ODbL)';
+  B.MAX_BUILDINGS = 6000;
+  // Tuiles (z, x, y) qui couvrent le bloc (tourné ou non)
+  B.tilesFor = function(blk, z){
+    var bb = B.blockMercBox(blk, 0).box, n = Math.pow(2, z), W = 2 * Math.PI * R, out = [];
+    var tx = function(mx){ return Math.floor((mx + W / 2) / W * n); }, ty = function(my){ return Math.floor((W / 2 - my) / W * n); };
+    for (var y = ty(bb[3]); y <= ty(bb[1]); y++) for (var x = tx(bb[0]); x <= tx(bb[2]); x++) out.push({ z: z, x: x, y: y });
+    return out;
+  };
+  // Lecteur protobuf : varints jusqu'à 2^53 (les identifiants plus grands perdent leur précision : sans importance ici)
+  function Pbf(buf){ this.b = buf; this.p = 0; }
+  Pbf.prototype.varint = function(){
+    var b = this.b, v = 0, m = 1, c;
+    do { c = b[this.p++]; v += (c & 0x7f) * m; m *= 128; } while (c >= 0x80 && this.p < b.length);
+    return v;
+  };
+  Pbf.prototype.skip = function(wire){
+    if (wire === 0) this.varint(); else if (wire === 1) this.p += 8; else if (wire === 5) this.p += 4;
+    else if (wire === 2) { var l = this.varint(); this.p += l; } else throw new Error('tuile vectorielle illisible (type ' + wire + ')');
+  };
+  Pbf.prototype.bytes = function(){ var l = this.varint(), s = this.b.subarray(this.p, this.p + l); this.p += l; return s; };
+  var UTF8 = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8') : null;
+  function str(u8){ if (UTF8) return UTF8.decode(u8); var s = ''; for (var i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return s; }
+  function packed(u8){ var p = new Pbf(u8), out = []; while (p.p < u8.length) out.push(p.varint()); return out; }
+  function value(u8){
+    var p = new Pbf(u8), v = null, dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    while (p.p < u8.length) {
+      var t = p.varint(), f = t >> 3, w = t & 7;
+      if (f === 1) v = str(p.bytes());
+      else if (f === 2) { v = dv.getFloat32(p.p, true); p.p += 4; }
+      else if (f === 3) { v = dv.getFloat64(p.p, true); p.p += 8; }
+      else if (f === 4 || f === 5) v = p.varint();
+      else if (f === 6) { var z = p.varint(); v = z % 2 ? -(z + 1) / 2 : z / 2; }
+      else if (f === 7) v = !!p.varint();
+      else p.skip(w);
+    }
+    return v;
+  }
+  // Décode une tuile : { nomDeCouche: { extent, features: [{ type (1 point, 2 ligne, 3 polygone), props, rings: [[[x, y], …], …] }] } }.
+  // `only` (facultatif) = nom de la seule couche à décoder. Coordonnées de tuile (0 à extent, y vers le bas).
+  B.decodeTile = function(bytes, only){
+    var buf = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), p = new Pbf(buf), out = {};
+    while (p.p < buf.length) {
+      var t = p.varint();
+      if (t >> 3 !== 3 || (t & 7) !== 2) { p.skip(t & 7); continue; }
+      var lb = p.bytes(), lp = new Pbf(lb), name = '', extent = 4096, keys = [], vals = [], feats = [];
+      while (lp.p < lb.length) {
+        var lt = lp.varint(), lf = lt >> 3;
+        if (lf === 1) name = str(lp.bytes()); else if (lf === 2) feats.push(lp.bytes()); else if (lf === 3) keys.push(str(lp.bytes()));
+        else if (lf === 4) vals.push(lp.bytes()); else if (lf === 5) extent = lp.varint(); else lp.skip(lt & 7);
+      }
+      if (only && name !== only) continue;
+      vals = vals.map(value);
+      out[name] = { extent: extent, features: feats.map(function(fb){
+        var fp = new Pbf(fb), type = 0, tags = [], geom = [];
+        while (fp.p < fb.length) {
+          var ft = fp.varint(), ff = ft >> 3;
+          if (ff === 2) tags = packed(fp.bytes()); else if (ff === 3) type = fp.varint(); else if (ff === 4) geom = packed(fp.bytes()); else fp.skip(ft & 7);
+        }
+        var props = {};
+        for (var i = 0; i + 1 < tags.length; i += 2) props[keys[tags[i]]] = vals[tags[i + 1]];
+        // commandes : MoveTo (1), LineTo (2), ClosePath (7) ; paramètres en zigzag, relatifs au point précédent
+        var rings = [], ring = null, x = 0, y = 0, k = 0;
+        while (k < geom.length) {
+          var c = geom[k++], id = c & 7, cnt = c >> 3;
+          if (id === 7) { if (ring) ring = null; continue; }
+          for (var j = 0; j < cnt && k < geom.length; j++) {
+            var dx = geom[k++], dy = geom[k++];
+            x += (dx >>> 1) ^ -(dx & 1); y += (dy >>> 1) ^ -(dy & 1);
+            if (id === 1) { ring = []; rings.push(ring); }
+            if (ring) ring.push([x, y]);
+          }
+        }
+        return { type: type, props: props, rings: rings };
+      }) };
+    }
+    return out;
+  };
+  // Découpe d'un anneau par un rectangle [x0, y0, x1, y1] (Sutherland-Hodgman, une arête à la fois)
+  B.clipRing = function(ring, box){
+    var pts = ring;
+    for (var e = 0; e < 4 && pts.length; e++) {
+      var ax = e & 1, hi = e >= 2, lim = box[e], inside = function(q){ return hi ? q[ax] <= lim : q[ax] >= lim; }, res = [];
+      for (var i = 0; i < pts.length; i++) {
+        var a = pts[i], b = pts[(i + 1) % pts.length], ia = inside(a), ib = inside(b);
+        if (ia) res.push(a);
+        if (ia !== ib) { var t = (lim - a[ax]) / (b[ax] - a[ax]), q = [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]; q[ax] = lim; res.push(q); }
+      }
+      pts = res;
+    }
+    return pts;
+  };
+  function ringArea(r){ var s = 0; for (var i = 0, n = r.length; i < n; i++) { var a = r[i], b = r[(i + 1) % n]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
+  function r2(v){ return Math.round(v * 100) / 100; }
+  // Bâtiments d'une tuile dans le repère du bloc : [{ polygon: [[x, y], …] (sens antihoraire), holes?: [[[x, y], …]] (horaire),
+  // height, minHeight? }] en mètres. Chaque tuile est découpée à son bord exact (OpenFreeMap déborde un peu sur ses voisines :
+  // sans découpe, un bâtiment à cheval serait en double), puis au bord du bloc.
+  B.buildingsFromTile = function(bytes, t, blk){
+    var L = B.decodeTile(bytes, 'building').building, out = [];
+    if (!L) return out;
+    var E = L.extent, n = Math.pow(2, t.z), W = 2 * Math.PI * R, F = blk.F, hw = blk.wM / 2, hh = blk.hM / 2, tbox = [0, 0, E, E], bbox = [-hw, -hh, hw, hh];
+    var toLoc = function(q){
+      var mx = (t.x + q[0] / E) / n * W - W / 2, my = W / 2 - (t.y + q[1] / E) / n * W;
+      return B.rotIn(F, (mx - F.cx) / F.k, (my - F.cy) / F.k);
+    };
+    L.features.forEach(function(f){
+      if (f.type !== 3 || f.props.hide_3d === true) return;
+      var h = +f.props.render_height, mh = +f.props.render_min_height || 0, cur = null;
+      h = isFinite(h) && h > 0 ? Math.min(500, Math.max(2, h)) : 5;
+      if (!(mh > 0 && mh < h - 0.5)) mh = 0;
+      f.rings.forEach(function(r){
+        // anneau extérieur = aire positive en coordonnées de tuile (y vers le bas), selon la spécification MVT 2
+        var outer = ringArea(r) > 0, c = B.clipRing(r, tbox);
+        c = c.length >= 3 ? B.clipRing(c.map(toLoc), bbox) : [];
+        var a = c.length >= 3 ? ringArea(c) : 0;
+        if (outer) {
+          cur = null;
+          if (Math.abs(a) < 2) return;                                   // morceau de moins de 2 m² (bord de tuile ou de bloc)
+          if (a < 0) c.reverse();
+          cur = { polygon: c.map(function(q){ return [r2(q[0]), r2(q[1])]; }), height: r2(h) };
+          if (mh) cur.minHeight = r2(mh);
+          out.push(cur);
+        } else if (cur && Math.abs(a) >= 1) {
+          if (a > 0) c.reverse();
+          (cur.holes = cur.holes || []).push(c.map(function(q){ return [r2(q[0]), r2(q[1])]; }));
+        }
+      });
+    });
+    return out;
+  };
+  // Réunit les bâtiments de plusieurs tuiles ; au-delà de MAX_BUILDINGS, garde les plus grands
+  B.mergeBuildings = function(lists){
+    var all = [].concat.apply([], lists);
+    if (all.length > B.MAX_BUILDINGS) all = all.map(function(b){ return [Math.abs(ringArea(b.polygon)), b]; }).sort(function(a, b){ return b[0] - a[0]; }).slice(0, B.MAX_BUILDINGS).map(function(x){ return x[1]; });
+    return all;
   };
   function gridLen(v, n){
     if (v == null) return null;

@@ -99,6 +99,21 @@ Ajouts compatibles de 2026-11-14 (QA v0.7.7), toujours `version: 1` :
   adouci) : la route, l'eau, l'herbe ou la forêt de part et d'autre se prolonge sous l'ouvrage. Même format qu'avant (PNG reste PNG, JPEG au
   même niveau de qualité). Rien à faire côté lecteur.
 
+Ajouts compatibles de 2026-11-18 (QA v0.7.8, BS3D 0.8.1), toujours `version: 1` :
+- **`buildings[]`** (facultatif) : bâtiments 3D d'OpenFreeMap (tuiles vectorielles du zoom 14, schéma OpenMapTiles, données
+  OpenStreetMap), lus par QA pour le bloc quand la case « Joindre les bâtiments 3D » est cochée (par défaut).
+  `{ polygon: [[x, y], …], holes?: [[[x, y], …]], height, minHeight? }` dans le repère du bloc (m au sol, 2 décimales) :
+  `polygon` = contour extérieur, antihoraire, non refermé ; `holes` = cours intérieures, horaires ; `height` = hauteur du toit
+  au-dessus du sol (`render_height` d'OpenMapTiles, 2 à 500 m, 5 m par défaut) ; `minHeight` = bas d'une partie en surplomb
+  (`render_min_height`, absent si 0). Chaque tuile est découpée à son bord exact, puis au bord du bloc (un bâtiment à cheval
+  sur deux tuiles arrive en deux morceaux jointifs). Les contours marqués `hide_3d` (déjà décrits par leurs parties) sont
+  écartés. 6 000 au plus (les plus grands) ; BS3D en lit 8 000 au plus. `attribution[]` ajoute « Bâtiments 3D : OpenFreeMap
+  © OpenMapTiles, données © contributeurs OpenStreetMap (ODbL) ».
+- BS3D les extrude en blanc cassé : toit plat à la hauteur moyenne du MNT sous l'emprise + `height`, murs jusqu'au point le
+  plus bas du MNT mesuré (sans le lit des zones d'eau) ; les bâtiments sur le tablier ou les remblais du pont modélisé sont
+  omis ; aucun arbre n'y pousse. La case « 3D buildings » du panneau du site les masque (préférence du navigateur
+  `bs3d-dem-buildings`). Un lecteur plus ancien ignore `buildings`.
+
 ## Transport
 
 1. **BS3D ouvre QA** : bouton « IMPORT MNT/MNS » → `window.open(QA_URL + '?bs3d=1')`. QA en mode `bs3d` affiche un

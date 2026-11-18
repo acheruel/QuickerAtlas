@@ -308,7 +308,7 @@ ok('paquet v0.7.5 : rotation de la grille, attributs de route, densité ; herbe 
   assert.deepEqual([pk.zones[2].density, pk.zones[3].density, pk.zones[4].density], [2.5, 3, undefined]);
   assert.deepEqual(B.validatePacket(pk), []);
   assert.equal(B.buildPacket(base).grid.rotation, undefined, 'pas de rotation : champ absent (lecteurs plus anciens)');
-  assert.equal(B.SOURCE, 'QuickerAtlas v0.7.7');
+  assert.equal(B.SOURCE, 'QuickerAtlas v0.7.8');
   // herbe du 13741 sur l'imagerie : champ vert sombre, terre-plein, champ jauni ; pas l'asphalte, ni l'eau, ni un sol rouge
   assert.ok(B.oliveGreen(98, 102, 69) && B.oliveGreen(83, 100, 59) && B.oliveGreen(128, 120, 94));
   assert.ok(!B.oliveGreen(120, 120, 118) && !B.oliveGreen(40, 60, 90) && !B.oliveGreen(160, 110, 80) && !B.oliveGreen(20, 30, 12));
@@ -435,6 +435,82 @@ ok('v0.7.7 : image sous l\'ancien pont, deux couleurs de rive = dégradé contin
   assert.deepEqual(at(0, -12), A); assert.deepEqual(at(0, 12), Bc);
   assert.ok(Math.abs(at(-31, 0)[0] - at(-33, 0)[0]) < 200, 'bout du tablier : pas d\'exception');
   assert.equal(B.fillImageCorridor(px, w, h, 100, 100, [[0, 0], [0, 0]], 10), 0, 'axe nul : rien');
+});
+
+// v0.7.8 : bâtiments 3D d'OpenFreeMap. Mini-encodeur MVT (protobuf) pour fabriquer une tuile d'essai.
+function mvt(layers){
+  var vi = function(n){ var o = []; while (n >= 128) { o.push((n % 128) | 128); n = Math.floor(n / 128); } o.push(n); return o; };
+  var fld = function(f, w){ return vi(f * 8 + w); }, ld = function(f, b){ return fld(f, 2).concat(vi(b.length), b); };
+  var s = function(t){ return Array.from(Buffer.from(t, 'utf8')); }, zz = function(n){ return n >= 0 ? 2 * n : -2 * n - 1; };
+  var geom = function(rings){ var g = [], x = 0, y = 0; rings.forEach(function(r){
+    g.push(1 | (1 << 3), zz(r[0][0] - x), zz(r[0][1] - y)); x = r[0][0]; y = r[0][1];
+    g.push(2 | ((r.length - 1) << 3)); for (var i = 1; i < r.length; i++) { g.push(zz(r[i][0] - x), zz(r[i][1] - y)); x = r[i][0]; y = r[i][1]; }
+    g.push(7 | (1 << 3)); }); return g; };
+  var out = [];
+  layers.forEach(function(L){
+    var keys = [], vals = [], body = ld(1, s(L.name)), ix = function(a, v){ var i = a.indexOf(v); if (i < 0) { a.push(v); i = a.length - 1; } return i; };
+    L.features.forEach(function(f){
+      var tags = []; Object.keys(f.props).forEach(function(k){ tags.push(ix(keys, k), ix(vals, f.props[k])); });
+      var pk = [].concat.apply([], tags.map(vi)), gm = [].concat.apply([], geom(f.rings).map(vi));
+      body = body.concat(ld(2, ld(2, pk).concat(fld(3, 0), vi(f.type || 3), ld(4, gm))));
+    });
+    keys.forEach(function(k){ body = body.concat(ld(3, s(k))); });
+    vals.forEach(function(v){ body = body.concat(ld(4, typeof v === 'string' ? ld(1, s(v)) : typeof v === 'boolean' ? fld(7, 0).concat(vi(v ? 1 : 0)) : fld(5, 0).concat(vi(v)))); });
+    body = body.concat(fld(5, 0), vi(4096));
+    out = out.concat(ld(3, body));
+  });
+  return new Uint8Array(out);
+}
+ok('bâtiments 3D : décodage MVT, hauteur, cour intérieure, hide_3d, repère du bloc', function(){
+  var z = 14, x = 4951, y = 5775, n = Math.pow(2, z), W = 2 * Math.PI * B.R;
+  var ctr = B.unmerc((x + 0.5) / n * W - W / 2, W / 2 - (y + 0.5) / n * W), blk = B.blockFromCentre(ctr[0], ctr[1], 400, 400, 0);
+  var sq = function(c, r){ return [[c - r, c - r], [c + r, c - r], [c + r, c + r], [c - r, c + r]]; };
+  var tile = mvt([
+    { name: 'water', features: [{ props: { class: 'river' }, rings: [sq(1000, 50)] }] },
+    { name: 'building', features: [
+      { props: { render_height: 24, render_min_height: 0 }, rings: [sq(2048, 40), sq(2048, 10).reverse()] },
+      { props: { render_height: 30, render_min_height: 9, hide_3d: false }, rings: [sq(2148, 8)] },
+      { props: { render_height: 40, hide_3d: true }, rings: [sq(1948, 8)] },
+      { props: { render_height: 6 }, rings: [sq(3800, 20)] }                     // hors du bloc de 400 m
+    ] }
+  ]);
+  var T = B.decodeTile(tile);
+  assert.deepEqual(Object.keys(T).sort(), ['building', 'water']);
+  assert.equal(T.building.features.length, 4); assert.equal(T.building.features[1].props.render_min_height, 9);
+  assert.equal(T.building.features[2].props.hide_3d, true);
+  assert.deepEqual(T.building.features[0].rings[0][0], [2008, 2008]);
+  assert.deepEqual(Object.keys(B.decodeTile(tile, 'building')), ['building'], 'only : une seule couche');
+  var L = B.buildingsFromTile(tile, { z: z, x: x, y: y }, blk);
+  assert.equal(L.length, 2, 'hide_3d et hors bloc écartés');
+  assert.equal(L[0].height, 24); assert.equal(L[0].minHeight, undefined); assert.equal(L[1].minHeight, 9);
+  assert.equal(L[0].holes.length, 1, 'cour intérieure');
+  var area = function(r){ var s = 0; for (var i = 0; i < r.length; i++) { var a = r[i], b = r[(i + 1) % r.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; };
+  assert.ok(area(L[0].polygon) > 0 && area(L[0].holes[0]) < 0, 'extérieur antihoraire, cour horaire (repère y vers le nord)');
+  // 80 unités de tuile de côté : 80 / 4096 × (2πR / 2^14) m Mercator, ÷ k pour des mètres au sol
+  var side = 80 / 4096 * W / n / blk.F.k, xs = L[0].polygon.map(function(p){ return p[0]; });
+  near(Math.max.apply(null, xs) - Math.min.apply(null, xs), side, 0.05);
+  near(xs.reduce(function(a, b){ return a + b; }, 0) / 4, 0, 0.6, 'centré sur la tuile, donc sur le bloc');
+  // le second bâtiment est au sud-est du premier (y de tuile vers le bas)
+  assert.ok(L[1].polygon[0][0] > 0 && L[1].polygon[0][1] < 0);
+  // bloc tourné de 90° (sens horaire) : x du bloc = vers le sud, y = vers l'est
+  var L90 = B.buildingsFromTile(tile, { z: z, x: x, y: y }, B.blockFromCentre(ctr[0], ctr[1], 400, 400, 90));
+  assert.ok(L90[1].polygon[0][0] > 0 && L90[1].polygon[0][1] > 0, 'repère du bloc incliné');
+  var pk = B.buildPacket({ frame: blk.F, grid: { cols: 2, rows: 2, cell: 1, x0: 0, y0: 1 }, mnt: new Float32Array(4), zones: [], buildings: L });
+  assert.equal(pk.buildings.length, 2);
+  assert.equal(B.buildPacket({ frame: blk.F, grid: { cols: 2, rows: 2, cell: 1, x0: 0, y0: 1 }, mnt: new Float32Array(4), zones: [] }).buildings, undefined);
+});
+ok('bâtiments 3D : découpe au bord d\'une tuile, tuiles du bloc, plafond', function(){
+  var c = B.clipRing([[-10, -10], [10, -10], [10, 10], [-10, 10]], [0, -5, 100, 100]);
+  var xs = c.map(function(p){ return p[0]; }), ys = c.map(function(p){ return p[1]; });
+  assert.equal(Math.min.apply(null, xs), 0); assert.equal(Math.min.apply(null, ys), -5); assert.equal(Math.max.apply(null, xs), 10);
+  assert.equal(B.clipRing([[200, 200], [210, 200], [210, 210]], [0, 0, 100, 100]).length, 0);
+  var blk = B.blockFromCentre(46.8139, -71.208, 600, 600, 0), t = B.tilesFor(blk, 14);
+  assert.deepEqual(t.map(function(q){ return q.x + '/' + q.y; }), ['4951/5774', '4951/5775']);
+  assert.equal(B.tilesFor(B.blockFromCentre(46.8139, -71.208, 3000, 3000, 0), 14).length >= 4, true);
+  var saved = B.MAX_BUILDINGS; B.MAX_BUILDINGS = 2;
+  var m = B.mergeBuildings([[{ polygon: [[0, 0], [1, 0], [1, 1]], height: 5 }, { polygon: [[0, 0], [9, 0], [9, 9]], height: 5 }], [{ polygon: [[0, 0], [4, 0], [4, 4]], height: 5 }]]);
+  B.MAX_BUILDINGS = saved;
+  assert.deepEqual(m.map(function(b){ return b.polygon[1][0]; }), [9, 4], 'les plus grands d\'abord');
 });
 
 console.log(n + ' essais Bloc 3D : ok');

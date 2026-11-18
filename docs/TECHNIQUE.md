@@ -132,7 +132,7 @@ officiel en v0.7.1) et, depuis la v0.6.0, `js/lidar.js` (« Profil LiDAR »,
 contrat `window.QA_MOD.lidar.open(o)`) ne sont chargés qu'à la première ouverture. Contrat : `window.QA_MOD[clé].render(o, body, ctx)` ; la page leur
 prête `window.QA` (échappement, formats, `fetchT` borné dans le temps corps compris, `loadScript`, `distM`, `det`).
 
-**Export 3D vers BridgeSketch 3D** (v0.7.7 : visionneuse des images, `images[]` facultatif du paquet, image refaite sous l'ancien pont ; v0.7.2 ; onglet « Export 3D » en v0.7.4 ; depuis v0.7.5 : dernier choix du menu « Exporter », bloc droit ou incliné (`C.blockFromCentre`, repère tourné `F.rot`), image en dalles jusqu'à 4 096 px, plus aucune route détectée (le masque CanVec n'oriente que l'axe du pont), envoi vers une fenêtre BridgeSketch 3D déjà ouverte par `BroadcastChannel('bs3d-terrain-link')` ou vers une nouvelle) : v0.7.6 : image du site au choix parmi les orthophotos ouvertes du Québec (WMS Imagerie du MERN, capacités lues à l'ouverture ; GéoMont 2023), les 3 plus récentes qui couvrent vraiment le bloc (sonde de 320 px, 97 % de pixels opaques), à la finesse native (plafond 8 192 px, dalles de 2 000 px), PNG sans perte jusqu'à 25 Mo sinon JPEG 0,98 ; Esri reste le repli et l'image de détection des zones (`C.orthoCandidates`, `C.rankOrtho`, `C.orthoPlan`, `findOrtho`, `loadOrtho`).
+**Export 3D vers BridgeSketch 3D** (v0.7.8 : bâtiments 3D d'OpenFreeMap joints au paquet ; v0.7.7 : visionneuse des images, `images[]` facultatif du paquet, image refaite sous l'ancien pont ; v0.7.2 ; onglet « Export 3D » en v0.7.4 ; depuis v0.7.5 : dernier choix du menu « Exporter », bloc droit ou incliné (`C.blockFromCentre`, repère tourné `F.rot`), image en dalles jusqu'à 4 096 px, plus aucune route détectée (le masque CanVec n'oriente que l'axe du pont), envoi vers une fenêtre BridgeSketch 3D déjà ouverte par `BroadcastChannel('bs3d-terrain-link')` ou vers une nouvelle) : v0.7.6 : image du site au choix parmi les orthophotos ouvertes du Québec (WMS Imagerie du MERN, capacités lues à l'ouverture ; GéoMont 2023), les 3 plus récentes qui couvrent vraiment le bloc (sonde de 320 px, 97 % de pixels opaques), à la finesse native (plafond 8 192 px, dalles de 2 000 px), PNG sans perte jusqu'à 25 Mo sinon JPEG 0,98 ; Esri reste le repli et l'image de détection des zones (`C.orthoCandidates`, `C.rankOrtho`, `C.orthoPlan`, `findOrtho`, `loadOrtho`).
 `js/bloc3d.js` (interface : sa propre carte satellite Leaflet dans `#view-export3d`, volet à droite, barre d'outils sur la
 carte), `js/bloc3d-calc.js` (fonctions pures, sans DOM ni réseau, testées par `tests/js/bloc3d_calc.mjs`) et `js/lidar.js`
 (GeoTIFF, WCS et Esri, exposés par `QA_MOD.lidar._geo` : `wcsBox(kind, bb, step, ms)`, `imgBox(bb, nw, nh, ms)`) sont chargés
@@ -164,6 +164,12 @@ carte), `js/bloc3d-calc.js` (fonctions pures, sans DOM ni réseau, testées par 
 - **Édition** : sélection = tableau d'identifiants ; clic, Ctrl + clic, Maj + glisser ou « Cadre de sélection » ; glisser une
   zone choisie déplace toute la sélection (bornée au bloc) ; Suppr, Ctrl + Z (40 instantanés JSON), Ctrl + A ; sommets pour
   une seule zone choisie.
+- **Bâtiments 3D** (v0.7.8, `buildings`, `drawBuildings`, case « Joindre les bâtiments 3D » cochée par défaut) : TileJSON
+  d'OpenFreeMap (`C.OFM_TILEJSON`, adresse des tuiles du jour), tuiles du zoom 14 qui couvrent le bloc (`C.tilesFor`, 16 au plus),
+  décodage MVT maison (`C.decodeTile`, couche `building` seule), découpe au bord exact de la tuile puis du bloc
+  (`C.clipRing`, Sutherland-Hodgman), passage au repère du bloc (`C.buildingsFromTile` : `render_height`, `render_min_height`,
+  `hide_3d` écarté, morceaux < 2 m² écartés), 6 000 au plus (`C.mergeBuildings`). Carte : canevas `x3dBld` au-dessus des zones,
+  sans clics. Paquet : `buildings[]` + crédit OpenFreeMap / OpenMapTiles / OpenStreetMap.
 - **Envoi** : mode `?bs3d=1` (ouvert par BridgeSketch 3D) → `window.opener.postMessage(paquet, '*', transférables)` ; sinon
   `window.open(BS3D_URL + '#terrain-import')`, attente de `{ type: 'bs3d-ready' }` (60 s), puis envoi ; `BS3D_URL` peut être
   remplacée par `localStorage['qa-bs3d-url']`. « Télécharger .bs3dterrain » = JSON avec grilles en base64. Aucune donnée n'est

@@ -30,7 +30,7 @@
   var ORDER = ['river', 'water', 'forest', 'grass', 'road'];
   var S = { host: null, map: null, side: null, bar: null, o: null, bs3d: false, mode: 'select', rect: null, blk: null, grid: null, rectL: null, handles: [], drawing: false, run: 0,
     data: null, zones: [], axis: null, axisSrc: null, sel: [], zl: {}, vh: [], tool: null, svg: null, nextId: 1, steps: [], status: null, sending: null, undo: [], box: false, dots: null, side0: 600, strip: true,
-    rot0: 0, win: null, tabs: {}, bc: null, ortho: null, orthoCands: null, allImg: false, clean: null, cleaning: false, lb: null, me: 'qa-' + Math.random().toString(36).slice(2, 10), ackCore: null };
+    rot0: 0, win: null, tabs: {}, bc: null, ortho: null, orthoCands: null, allImg: false, clean: null, cleaning: false, lb: null, me: 'qa-' + Math.random().toString(36).slice(2, 10), ackCore: null, bld: true, bldL: null, bldR: null };
   var $ = function(s){ return S.host.querySelector(s); };
 
   // ---------- Outils ----------
@@ -74,6 +74,10 @@
     L.tileLayer(QA.ESRI + 'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 18, maxZoom: 20, opacity: 0.9 }).addTo(map);
     L.control.scale({ imperial: false }).addTo(map);
     map.createPane('x3dPane').style.zIndex = 405;
+    // v0.7.8 : bâtiments 3D d'OpenFreeMap, sur un canevas (des milliers de polygones), au-dessus des zones (la teinte des forêts
+    // les cachait) mais transparents aux clics : les zones restent sélectionnables à travers
+    map.createPane('x3dBld').style.zIndex = 406; map.getPane('x3dBld').style.pointerEvents = 'none';
+    S.bldR = L.canvas({ pane: 'x3dBld' });
     S.svg = L.svg({ pane: 'x3dPane' });
     S.dots = L.layerGroup().addTo(map);
     map.on('moveend', drawDots);
@@ -208,6 +212,10 @@
       'MNT ' + fmt(d.fin * 100) + ' % · ' + (d.mns ? 'MNS' : 'sans MNS') + ' · ' + (d.jpeg ? 'image' : 'sans image') + ' · ' + QA.nf1.format(d.seconds) + ' s</div></div>';
     if (d.warns.length) h += '<ul class="x3d-warns">' + d.warns.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>';
     h += imageHtml();
+    // v0.7.8 : bâtiments 3D d'OpenFreeMap (blancs dans BridgeSketch 3D) : joints ou non
+    var nb = d.buildings.length;
+    h += '<div class="x3d-sec"><div class="x3d-h">Bâtiments 3D (' + nb + ')</div>' + (nb ? '<label class="x3d-chk"><input type="checkbox" data-act="bld"' + (S.bld ? ' checked' : '') + '><span>Joindre les bâtiments 3D <small>(OpenFreeMap, hauteurs d’OpenStreetMap ; blancs dans BridgeSketch 3D, où une case les masque)</small></span></label>' :
+      '<small class="x3d-note">Aucun bâtiment d’OpenFreeMap dans ce bloc.</small>') + '</div>';
     h += '<div class="x3d-sec"><div class="x3d-h">Zones du site (' + S.zones.length + ')</div><ul class="x3d-fam">' + ORDER.map(function(k){
       var zs = S.zones.filter(function(z){ return z.type === k; }), n = zs.length, on = n && zs.every(function(z){ return isSel(z.id); });
       return '<li class="' + (n ? '' : 'none') + '">' + swatch(k) + '<button type="button" class="x3d-famname" data-act="fam" data-t="' + k + '"' + (n ? '' : ' disabled') + ' aria-pressed="' + !!on + '" title="Sélectionner toutes les zones de ce type">' + TYPES[k].many + '</button><b>' + n + '</b>' +
@@ -730,6 +738,7 @@
       { id: 'img', label: 'Image satellite Esri (détection des zones, repli)', state: 'run' },
       { id: 'ortho', label: 'Orthophotos ouvertes du Québec (MERN, GéoMont)', state: 'run' },
       { id: 'road', label: 'Direction de la route, pour l’axe du pont (CanVec)', state: 'run' },
+      { id: 'bld', label: 'Bâtiments 3D (OpenFreeMap)', state: 'run' },
       { id: 'calc', label: 'Détection des zones', state: 'wait' }
     ];
     S.mode = 'busy'; S.status = null; clearZoneLayers(); handles(null); S.dots.clearLayers(); render();
@@ -752,15 +761,36 @@
     }, function(e){ step('ortho', 'warn', 'indisponible (' + errText(e) + ') : image Esri'); return { list: [], fails: 1 }; });
     var tRoad = roadMask(bbImg, Math.min(1500, Math.round(Wa)), Math.min(1500, Math.round(Ha)), 15000).then(function(m){ step('road', 'ok'); m.halfE = bi.halfE; m.halfN = bi.halfN; return m; },
       function(e){ step('road', 'warn', 'indisponible (' + errText(e) + ')'); warns.push('Routes CanVec indisponibles : l’axe du pont est proposé est-ouest, à ajuster.'); return null; });
-    Promise.all([tDem, tMns, tImg, tRoad, tOrtho]).then(function(r){
+    var tBld = buildings(blk, 20000).then(function(b){ step('bld', 'ok', b.length ? plural(b.length, 'bâtiment', 'bâtiments') : 'aucun dans ce bloc'); return b; },
+      function(e){ step('bld', 'warn', 'indisponibles (' + errText(e) + ')'); warns.push('Bâtiments 3D d’OpenFreeMap indisponibles : le bloc part sans bâtiments.'); return []; });
+    Promise.all([tDem, tMns, tImg, tRoad, tOrtho, tBld]).then(function(r){
       if (run !== S.run) return;
-      step('calc', 'run'); return wait(30).then(function(){ return finish(run, r[0], r[1], r[2], r[3], r[4], warns, t0, { blk: blk, bi: bi, bbImg: bbImg }); });
+      step('calc', 'run'); return wait(30).then(function(){ return finish(run, r[0], r[1], r[2], r[3], r[4], warns, t0, { blk: blk, bi: bi, bbImg: bbImg }, r[5]); });
     }).catch(function(e){
       if (run !== S.run) return;
       if (window.console) console.error(e);
       S.mode = 'select'; handles(S.rect);
       status('err', 'Échec de l’extraction : ' + esc(errText(e)) + '. Réessayez ou choisissez un bloc plus petit.');
     });
+  }
+  // v0.7.8 : bâtiments 3D d'OpenFreeMap : TileJSON (adresse des tuiles du jour), puis les tuiles du zoom 14 qui couvrent le bloc
+  function buildings(blk, ms){
+    return fetchT(C.OFM_TILEJSON, null, ms, 'json').then(function(tj){
+      var url = tj && tj.tiles && tj.tiles[0];
+      if (!url) throw new Error('TileJSON sans tuiles');
+      var tiles = C.tilesFor(blk, C.OFM_ZOOM);
+      if (tiles.length > 16) throw new Error('bloc trop grand');
+      return Promise.all(tiles.map(function(t){
+        return fetchT(url.replace('{z}', t.z).replace('{x}', t.x).replace('{y}', t.y), null, ms, 'arrayBuffer').then(function(buf){ return C.buildingsFromTile(new Uint8Array(buf), t, blk); });
+      })).then(C.mergeBuildings);
+    });
+  }
+  function drawBuildings(){
+    if (S.bldL) { S.map.removeLayer(S.bldL); S.bldL = null; }
+    var b = S.data && S.data.buildings;
+    if (!S.bld || !b || !b.length) return;
+    S.bldL = L.polygon(b.map(function(x){ return [x.polygon.map(ll)].concat((x.holes || []).map(function(h){ return h.map(ll); })); }),
+      { pane: 'x3dBld', renderer: S.bldR, color: '#ffffff', weight: 1, opacity: 0.95, fillColor: '#ffffff', fillOpacity: 0.7, interactive: false }).addTo(S.map);
   }
   // Lignes des routes CanVec dans le repère du bloc (le masque est nord en haut, centré sur le bloc) : pour l'axe du pont seulement
   function axisRoads(mask, F_){
@@ -769,7 +799,7 @@
       return r.line.map(function(p){ return C.rotIn(F_, p[0], p[1]); });
     });
   }
-  function finish(run, dem, dsm, im, mask, ortho, warns, t0, geo){
+  function finish(run, dem, dsm, im, mask, ortho, warns, t0, geo, bld){
     if (run !== S.run) return;
     var F_ = S.blk.F, grid = S.grid, hw = grid.cols * grid.cell / 2, hh = grid.rows * grid.cell / 2;
     var mnt = C.resample(dem, F_, grid), mns = dsm ? C.resample(dsm, F_, grid) : null, fin = C.finiteFraction(mnt);
@@ -791,7 +821,7 @@
     S.ortho = { list: (ortho && ortho.list || []).map(function(x){ return { c: x.c, prev: x.prev, state: 'idle', note: '', res: null }; }), sel: 'esri', geo: geo, msg: ortho && ortho.fails && !(ortho.list || []).length ? 'Serveur d’orthophotos indisponible : image Esri.' : '' };
     if (S.ortho.list.length || !jpeg) S.ortho.sel = S.ortho.list.length ? 0 : 'esri';
     S.data = { F: F_, grid: grid, mnt: mnt, mns: mns, jpeg: jpeg, thumb: im ? imgThumb(im) : null, fin: fin, zmin: zmin, zmax: zmax, hs: C.hillshade(mnt, grid.cols, grid.rows, grid.cell, 340),
-      attribution: attribution, warns: warns, det: det.stats, seconds: (performance.now() - t0) / 1000 };
+      attribution: attribution, warns: warns, det: det.stats, seconds: (performance.now() - t0) / 1000, buildings: bld || [] };
     S.zones = zones; S.sel = []; S.tool = null; S.undo = [];
     // axe proposé : la route la plus proche de la structure donne la direction ; le tablier visible dans le MNS donne les deux bouts
     S.axis = null; S.axisSrc = null;
@@ -809,7 +839,7 @@
     }
     S.mode = 'edit'; S.status = null;
     S.rectL.closeTooltip();
-    drawZones(); drawAxis(); drawStructure();
+    drawBuildings(); drawZones(); drawAxis(); drawStructure();
     S.map.fitBounds(rectBounds(S.rect), { padding: [30, 30], animate: false });
     render(); ping();
     if (S.ortho.list.length) loadOrtho(0);                       // la plus récente part tout de suite, pendant la correction des zones
@@ -827,6 +857,7 @@
     clearVtx();
     if (S.axisL) { S.axisL.forEach(function(x){ S.map.removeLayer(x); }); S.axisL = null; }
     if (S.structL) { S.map.removeLayer(S.structL); S.structL = null; }
+    if (S.bldL) { S.map.removeLayer(S.bldL); S.bldL = null; }
   }
   function zoneLatLngs(z){ return pts(z).map(ll); }
   function drawZones(){
@@ -1051,13 +1082,15 @@
     if (im) attr.push(im.attribution);
     set.images.forEach(function(m){ if (attr.indexOf(m.attribution) < 0) attr.push(m.attribution); });
     if (im && im.ortho && d.jpeg) attr.push('Zones d’herbe détectées d’après Esri World Imagery');
+    var bld = S.bld && d.buildings.length ? d.buildings : null;
+    if (bld) attr.push(C.OFM_ATTR);
     // v0.7.4 : le pont existant est retiré du relief envoyé (terrain continu sous l'ouvrage), sauf si la case est décochée
     var g = S.axis && S.strip ? C.removeBridge(d.grid, d.mnt, d.mns, S.axis, deckWidth()) : { mnt: d.mnt, mns: d.mns };
     return C.buildPacket({
       frame: { lat: d.F.lat, lon: d.F.lon }, rotation: d.F.rot || 0, grid: d.grid, mnt: g.mnt, mns: g.mns, image: set.image, images: set.images,
       zones: S.zones.map(function(z){ return { type: z.type, source: z.source, polygon: z.polygon, line: z.line, width: z.width, level: z.level }; }),
       bridge: S.axis ? { axis: S.axis, structure: S.o ? { id: String(S.o.num), name: structName(S.o) } : null } : null,
-      attribution: attr
+      buildings: bld, attribution: attr
     });
   }
   function deckWidth(){ var w = S.o && parseFloat(S.o.larg); return isFinite(w) && w >= 2 ? Math.min(60, w) : 12; }
@@ -1102,7 +1135,7 @@
     var m = C.packetForPost(p), id = 'qa-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
     m.message.transferId = id;
     var mo = (p.mnt.length + (p.mns ? p.mns.length : 0)) * 4 / 1048576,
-      sent = 'Terrain envoyé (' + QA.nf1.format(mo) + ' Mo de grilles' + (p.image ? ' + image de ' + QA.nf1.format(p.image.dataUrl.length * 0.75 / 1048576) + ' Mo' : '') + (p.images ? ' + ' + plural(p.images.length, 'autre image', 'autres images') + ' (' + QA.nf1.format(p.images.reduce(function(n, m){ return n + m.dataUrl.length * 0.75; }, 0) / 1048576) + ' Mo)' : '') + ', ' + plural(p.zones.length, 'zone', 'zones') + (p.bridge ? ', axe du pont' : ', sans axe') + ').';
+      sent = 'Terrain envoyé (' + QA.nf1.format(mo) + ' Mo de grilles' + (p.image ? ' + image de ' + QA.nf1.format(p.image.dataUrl.length * 0.75 / 1048576) + ' Mo' : '') + (p.images ? ' + ' + plural(p.images.length, 'autre image', 'autres images') + ' (' + QA.nf1.format(p.images.reduce(function(n, m){ return n + m.dataUrl.length * 0.75; }, 0) / 1048576) + ' Mo)' : '') + ', ' + plural(p.zones.length, 'zone', 'zones') + (p.buildings ? ', ' + plural(p.buildings.length, 'bâtiment', 'bâtiments') : '') + (p.bridge ? ', axe du pont' : ', sans axe') + ').';
     var head = listenAck(target, id, sent);
     target.postMessage(m.message, origin, m.transfer);
     status('ok', head + '<br>' + sent + ' En attente de BridgeSketch 3D…');
@@ -1228,6 +1261,7 @@
   function onChange(e){
     var t = e.target, act = t.getAttribute && t.getAttribute('data-act'), zs = selZones();
     if (act === 'strip') { S.strip = t.checked; return; }
+    if (act === 'bld') { S.bld = t.checked; drawBuildings(); return; }
     if (act === 'img') { chooseImage(t.value); return; }
     if (act === 'allimg') { setAllImg(t.checked); return; }
     if (act === 'rot') { var deg = parseFloat(String(t.value).replace(',', '.')); if (isFinite(deg) && S.mode === 'select') { setRot(deg); render(); } return; }
